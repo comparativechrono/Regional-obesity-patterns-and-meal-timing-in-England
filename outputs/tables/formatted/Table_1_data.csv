@@ -1,0 +1,36 @@
+,Reception (age 4-5),Year 6 (age 10-11)
+National monthly series (NHS Digital Tables 3-4),,
+  School years analysed,2007/08 to 2018/19 (12 complete years),2007/08 to 2018/19 (12 complete years)
+  Children measured,"6,847,756","6,275,706"
+"  Measured Sep-Dec (autumn term), %",22.3,40.7
+"  Measured Jan-Mar (spring term), %",46.5,34.9
+"  Measured Apr-Jul (summer term), %",31.2,24.4
+  Modal month of measurement,March,November
+"  Mean school month of measurement (Sep = 1), range across years",6.3 (5.9-7.3),5.5 (4.7-7.4)
+"Local-authority data, 2023/24 (OHID Fingertips)",,
+  Children measured (England),"560,720","606,863"
+  Underweight: England % (LA range); LAs analysed,1.2 (0.4-4.3); N = 143,1.7 (0.5-3.6); N = 150
+  Overweight incl. obesity: England % (LA range); LAs analysed,22.1 (15.2-29.7); N = 151,35.8 (25.5-45.5); N = 151
+  Obesity incl. severe: England % (LA range); LAs analysed,9.6 (5.7-13.9); N = 151,22.1 (13.3-31.0); N = 151
+  Severe obesity: England % (LA range); LAs analysed,2.6 (1.2-4.7); N = 149,5.5 (2.4-9.7); N = 151
+"Local-authority data, 2024/25 (OHID Fingertips)",,
+  Children measured (England),"545,589","600,304"
+  Underweight: England % (LA range); LAs analysed,1.1 (0.3-3.6); N = 141,1.6 (0.7-3.8); N = 150
+  Overweight incl. obesity: England % (LA range); LAs analysed,23.5 (17.0-32.4); N = 151,36.2 (23.6-45.6); N = 151
+  Obesity incl. severe: England % (LA range); LAs analysed,10.5 (4.6-15.4); N = 151,22.2 (12.1-30.7); N = 151
+  Severe obesity: England % (LA range); LAs analysed,2.9 (1.2-4.7); N = 150,5.6 (2.5-9.4); N = 151
+"Local-authority data, 2025/26 (OHID Fingertips)",,
+  Children measured (England),"534,031","598,419"
+  Underweight: England % (LA range); LAs analysed,1.1 (0.3-3.5); N = 140,1.6 (0.6-4.0); N = 150
+  Overweight incl. obesity: England % (LA range); LAs analysed,23.8 (16.2-32.3); N = 151,36.9 (24.2-46.0); N = 151
+  Obesity incl. severe: England % (LA range); LAs analysed,10.7 (5.2-15.8); N = 151,22.8 (12.4-32.1); N = 151
+  Severe obesity: England % (LA range); LAs analysed,3.0 (0.6-5.2); N = 150,5.9 (2.4-10.3); N = 151
+Local-authority covariates (151 LAs),,
+"  Latitude of LA centroid, degrees N: mean (range)",52.5 (50.4-55.3),
+"  Annual range of day length, hours (range across LAs)",8.4-10.4,
+  IMD 2019 average score: mean (range),23.0 (5.8-45.0),
+"  Dependent children who are Asian, %: mean (range)",12.5 (0.6-63.9),
+"  Dependent children who are Black, %: mean (range)",6.1 (0.1-36.7),
+"  Dependent children who are Mixed, %: mean (range)",6.9 (1.6-16.5),
+"  Dependent children who are Other, %: mean (range)",2.9 (0.3-18.9),
+"  Dependent children who are White, %: mean (range)",71.6 (15.2-96.4),

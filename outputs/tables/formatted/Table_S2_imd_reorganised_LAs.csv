@@ -1,0 +1,8 @@
+new_code,method,imd_score,idaci_score
+E06000060,identical boundary: Buckinghamshire County (E10000002) from File 11,10.052,0.085
+E06000065,identical boundary: North Yorkshire County (E10000023) from File 11,14.762,0.099
+E06000066,identical boundary: Somerset County (E10000027) from File 11,18.553,0.136
+E06000061,"population-weighted mean of 2019 districts E07000150, E07000152, E07000153, E07000156 from File 10",19.669,0.152
+E06000062,"population-weighted mean of 2019 districts E07000151, E07000154, E07000155 from File 10",17.75,0.129
+E06000063,"population-weighted mean of 2019 districts E07000026, E07000028, E07000029 from File 10",23.089,0.153
+E06000064,"population-weighted mean of 2019 districts E07000027, E07000030, E07000031 from File 10",19.026,0.113
