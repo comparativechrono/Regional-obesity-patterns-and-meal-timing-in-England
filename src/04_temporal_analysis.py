@@ -12,12 +12,19 @@ at different ages.
 
 Analyses
   1. When children are measured.
-  2. The within-year pattern month by month, and its change within periods: the autumn term
-     (September-December, when days shorten), the spring term (January-March), and May-July
-     (after the spring peak); the spring peak (April against March and May).
+  2. The within-year pattern month by month, and change while days are shortening and while
+     they are lengthening. Between mid-month dates, days shorten from September to December and
+     again from June to July (after the summer solstice), and lengthen from December to June.
+     (a) Mean month-to-month change in shortening and in lengthening intervals (first
+         differences within each school year), compared across the 12 school years.
+     (b) The shortening-days model: y = school year + b * (months of shortening days elapsed
+         since mid-September) + a * school month + g * April, so b is the change per month of
+         shortening days and a any steady change through the year; b compared between cohorts.
+     (c) The spring peak (April against March and May) and the same contrast for January.
+     Change within fixed periods (Sep-Dec, Jan-Mar, May-Jul) is also recorded.
   3. The shape of the within-year change: a single linear school-year trend against a decline
-     that stops part-way through the year (end of the decline estimated from the data), a
-     linear trend plus day length, and unrestricted month effects (AIC, BIC).
+     that ends at an estimated month, the shortening-days forms, a linear trend plus day
+     length, and unrestricted month effects (AIC, BIC).
   4. Location (mean) and spread (SD) of the BMI z-score distribution during the autumn decline
      and in May-July.
   5. Month-to-month pattern shared by the two cohorts and cohort-specific change:
@@ -68,6 +75,16 @@ def year_by_month(data, cohort, y):
 
 day = df.groupby("acad_month")["mid_month_doy"].first().reindex(MONTHS).values
 D_month = day_length(REFERENCE_LATITUDE, day)
+# Months of shortening days elapsed since mid-September (counted day by day at 52.5N), and the
+# direction of day-length change between consecutive mid-month dates.
+_start = int(day[0])
+_daily = day_length(REFERENCE_LATITUDE, (np.arange(_start, _start + 366) - 1) % 365 + 1)
+_shortening_day = np.diff(_daily) < 0
+S_month = np.array([_shortening_day[:(int(d) - _start) % 365].sum() / 30.44 for d in day])
+SHORT = np.diff(D_month) < 0                   # interval m -> m + 1 (10 intervals)
+INTERVALS = [f"{a[:3]}-{b[:3]}" for a, b in zip(ACAD_MONTHS[:-1], ACAD_MONTHS[1:])]
+df["short_months"] = S_month[df.acad_month.values - 1]
+df["april"] = (df.acad_month == APRIL).astype(float)
 
 # ---------------------------------------------------------------------------
 # 1. Measurement timing
@@ -132,6 +149,20 @@ for c in COHORTS:
         row.update({"january_peak": jan.mean(), "january_peak_ci_low": jan.mean() - half_j,
                     "january_peak_ci_high": jan.mean() + half_j, "january_peak_p": stats.ttest_1samp(jan, 0).pvalue,
                     "january_peak_n_positive": int((jan > 0).sum())})
+        # change while days shorten vs while they lengthen: mean month-to-month change per year
+        diffs = np.diff(piv.values, axis=1)
+        sh, ln = diffs[:, SHORT].mean(axis=1), diffs[:, ~SHORT].mean(axis=1)
+        for nm, v in (("short", sh), ("long", ln)):
+            h = stats.t.ppf(0.975, len(v) - 1) * v.std(ddof=1) / np.sqrt(len(v))
+            row.update({f"chg_{nm}": v.mean(), f"chg_{nm}_ci_low": v.mean() - h, f"chg_{nm}_ci_high": v.mean() + h})
+        dlt = sh - ln
+        row.update({"p_short_vs_long": stats.ttest_rel(sh, ln).pvalue,
+                    "n_years_same_direction": int((np.sign(dlt) == np.sign(dlt.mean())).sum())})
+        # shortening-days model
+        sm_ = cluster_fit(f"{y} ~ C(ncmp_year) + short_months + acad_month + april", df[df.cohort == c])
+        for term, nm in (("short_months", "per_short"), ("acad_month", "steady"), ("april", "april_term")):
+            ci_ = sm_.conf_int().loc[term]
+            row.update({nm: sm_.params[term], f"{nm}_ci_low": ci_[0], f"{nm}_ci_high": ci_[1], f"{nm}_p": sm_.pvalues[term]})
         # month means: deviation from each school year's mean, and year-adjusted level
         dev = piv.sub(piv.mean(axis=1), axis=0)
         for mth in MONTHS:
@@ -143,6 +174,18 @@ for c in COHORTS:
         period_rows.append(row)
 periods = pd.DataFrame(period_rows)
 periods.to_csv(OUT_TAB / "monthly_within_year_change.csv", index=False)
+
+# Underweight mirrors the rest of the distribution: correlation of the within-year profiles
+mirror = {}
+for c in COHORTS:
+    prof = {y: year_by_month(df, c, y).pipe(lambda p_: p_.sub(p_.mean(axis=1), axis=0)).mean().values
+            for y in ["pct_underweight", "pct_owob", "pct_obese", "z_mean"]}
+    uw = pd.Series(prof["pct_underweight"], index=ACAD_MONTHS)
+    mirror[c] = {"r_underweight_vs_z_mean": float(np.corrcoef(prof["pct_underweight"], prof["z_mean"])[0, 1]),
+                 "r_underweight_vs_owob": float(np.corrcoef(prof["pct_underweight"], prof["pct_owob"])[0, 1]),
+                 "r_underweight_vs_obese": float(np.corrcoef(prof["pct_underweight"], prof["pct_obese"])[0, 1]),
+                 "underweight_highest_sep_to_jun": uw.iloc[:10].idxmax()}
+results["mirror"] = mirror
 monthly_means = pd.DataFrame(monthly_means)
 monthly_means.to_csv(OUT_TAB / "monthly_means_by_month.csv", index=False)
 
@@ -183,11 +226,10 @@ def best_knot(Y, with_april=True):
 
 
 FORMS = {
-    "linear school-year trend": lambda Y: MONTHS[:, None].astype(float),
-    "linear trend + April": lambda Y: np.column_stack([MONTHS, apr]),
-    "decline, then level": lambda Y: knot_x(best_knot(Y, with_april=False)),
+    "single linear trend": lambda Y: MONTHS[:, None].astype(float),
     "decline, then level + April": lambda Y: np.column_stack([knot_x(best_knot(Y)), apr]),
-    "linear trend + day length": lambda Y: np.column_stack([MONTHS, D_month]),
+    "shortening days + April": lambda Y: np.column_stack([S_month, apr]),
+    "shortening days + linear trend + April": lambda Y: np.column_stack([S_month, MONTHS, apr]),
     "linear trend + day length + April": lambda Y: np.column_stack([MONTHS, D_month, apr]),
     "month effects": lambda Y: np.eye(11)[:, 1:],
 }
@@ -206,15 +248,26 @@ for c in COHORTS:
         row["end_of_decline_boot_mode"] = ACAD_MONTHS[int(counts.idxmax()) - 1]
         row["end_of_decline_boot_dec_or_jan"] = float(counts.reindex([4, 5]).fillna(0).sum())
         row["end_of_decline_boot_range"] = "-".join(ACAD_MONTHS[int(v) - 1][:3] for v in np.percentile(boot, [2.5, 97.5]))
-        # lack of fit of the decline-then-level form against unrestricted month effects
-        kk = best_knot(Y)
-        s_r, k_r, n_ = fit_shape(Y, np.column_stack([knot_x(kk), apr]))
+        # lack of fit of the shortening-days form against unrestricted month effects
+        s_r, k_r, n_ = fit_shape(Y, np.column_stack([S_month, MONTHS, apr]))
         s_f, k_f, _ = fit_shape(Y, np.eye(11)[:, 1:])
         F = ((s_r - s_f) / (k_f - k_r)) / (s_f / (n_ - k_f))
         row["lack_of_fit_F"], row["lack_of_fit_p"] = F, stats.f.sf(F, k_f - k_r, n_ - k_f)
         shape_rows.append(row)
 shape = pd.DataFrame(shape_rows)
 shape.to_csv(OUT_TAB / "monthly_shape_comparison.csv", index=False)
+
+# Is the change per month of shortening days the same in the two cohorts? (joint model, school-year clusters)
+joint = []
+dj = df.assign(rec=(df.cohort == "Reception").astype(float), y6=(df.cohort == "Year 6").astype(float))
+for y, label in SHAPE_OUTCOMES.items():
+    f = smf.ols(f"{y} ~ C(cohort):C(ncmp_year) + short_months:rec + short_months:y6 + acad_month:rec + acad_month:y6"
+                " + april:rec + april:y6", dj).fit(cov_type="cluster", cov_kwds={"groups": dj["ncmp_year"]})
+    joint.append({"outcome": y, "label": label, "per_short_reception": f.params["short_months:rec"],
+                  "per_short_year6": f.params["short_months:y6"],
+                  "p_cohort_difference": float(f.t_test("short_months:rec - short_months:y6 = 0").pvalue)})
+joint = pd.DataFrame(joint)
+joint.to_csv(OUT_TAB / "monthly_shortening_cohort_comparison.csv", index=False)
 
 # ---------------------------------------------------------------------------
 # 4. Location vs spread: does a shift of the mean reproduce each category's change?
@@ -434,14 +487,13 @@ for label, data in samples.items():
         Fs = nested_f(X0, X1, data["z_mean"].values)
         row.update({"F_shared_z": Fs[0], "p_shared_z": Fs[3]})
     for c in COHORTS:
-        s = data[data.cohort == c]
-        for y in ["pct_obese", "z_mean"]:
-            for name in ("sep_dec", "jan_jul"):
-                m0, m1 = PERIODS[name]
-                sub = s[(s.acad_month >= m0) & (s.acad_month <= m1)]
-                if sub.acad_month.nunique() >= 2:
-                    f = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month", sub)
-                    row[f"{c}|{y}|{name}"], row[f"{c}|{y}|{name}|p"] = f.params["acad_month"], f.pvalues["acad_month"]
+        s_ = data[data.cohort == c].copy()
+        s_["short_months"] = S_month[s_.acad_month.values - 1]
+        s_["april"] = (s_.acad_month == APRIL).astype(float)
+        for y in ["pct_obese", "pct_underweight", "z_mean"]:
+            f = cluster_fit(f"{y} ~ C(ncmp_year) + short_months + acad_month + april", s_)
+            row[f"{c}|{y}|per_short"], row[f"{c}|{y}|per_short|p"] = f.params["short_months"], f.pvalues["short_months"]
+            row[f"{c}|{y}|steady"], row[f"{c}|{y}|steady|p"] = f.params["acad_month"], f.pvalues["acad_month"]
     sens.append(row)
 sens = pd.DataFrame(sens)
 sens.to_csv(OUT_TAB / "monthly_sensitivity.csv", index=False)
@@ -449,6 +501,9 @@ sens.to_csv(OUT_TAB / "monthly_sensitivity.csv", index=False)
 results.update({
     "within_year": periods.set_index(["cohort", "outcome"]).to_dict(orient="index"),
     "shape": shape.set_index(["cohort", "outcome"]).to_dict(orient="index"),
+    "shortening_cohort_comparison": joint.set_index("outcome").to_dict(orient="index"),
+    "short_months_by_month": dict(zip(ACAD_MONTHS, S_month.round(3).tolist())),
+    "shortening_intervals": [i for i, sh_ in zip(INTERVALS, SHORT) if sh_],
     "distribution_shift": shift.to_dict(orient="records"),
     "decomposition": decomp.set_index("outcome").to_dict(orient="index"),
     "shared_component": shared_tab.to_dict(orient="records"),
@@ -461,9 +516,8 @@ save_results("temporal", results)
 pd.set_option("display.width", 250)
 pd.set_option("display.max_columns", 60)
 print("TIMING", {c: (results["timing"][c]["terms_pct"], results["timing"][c]["modal_month"]) for c in COHORTS})
-cols = ["cohort", "outcome", "slope_sep_dec", "p_sep_dec", "slope_jan_mar", "p_jan_mar", "slope_may_jul", "p_may_jul",
-        "slope_jan_jul", "p_jan_jul", "p_autumn_vs_jan_jul", "april_peak", "april_peak_p", "april_peak_n_positive",
-        "january_peak", "january_peak_p"]
+cols = ["cohort", "outcome", "chg_short", "chg_long", "p_short_vs_long", "n_years_same_direction", "per_short",
+        "per_short_p", "steady", "steady_p", "april_peak", "april_peak_p", "january_peak", "january_peak_p"]
 print("\nWITHIN-YEAR CHANGE BY PERIOD"); print(periods[cols].round(4).to_string(index=False))
 aic_cols = [c for c in shape.columns if c.startswith("aic_")]
 d_aic = shape[aic_cols].sub(shape[aic_cols].min(axis=1), axis=0).round(1)
@@ -471,6 +525,9 @@ d_aic.columns = [c[4:] for c in aic_cols]
 print("\nSHAPE: delta AIC"); print(pd.concat([shape[["cohort", "outcome"]], d_aic], axis=1).to_string(index=False))
 print(shape[["cohort", "outcome", "end_of_decline", "end_of_decline_boot_mode", "end_of_decline_boot_dec_or_jan",
              "end_of_decline_boot_range", "lack_of_fit_F", "lack_of_fit_p"]].round(3).to_string(index=False))
+print("\nSHORTENING-DAYS COEFFICIENT BY COHORT"); print(joint.round(4).to_string(index=False))
+print("months of shortening elapsed:", dict(zip(ACAD_MONTHS, S_month.round(2))), "shortening intervals:",
+      [i for i, sh_ in zip(INTERVALS, SHORT) if sh_])
 print("\nDISTRIBUTION SHIFT"); print(shift.round(3).to_string(index=False))
 print("\nDECOMPOSITION"); print(decomp.round(4).T.to_string())
 print("\nEASTER"); print(easter_tests.round(3).to_string(index=False))

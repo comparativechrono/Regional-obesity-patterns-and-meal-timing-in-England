@@ -28,6 +28,32 @@ def deviation_from_year_mean(df, col):
     return mean, ci.fillna(0)
 
 
+def shortening_spans():
+    """x-ranges (school-month axis, mid-month = integer) when days are shortening: September to the
+    winter solstice, and the summer solstice to the end of July."""
+    doy_mid = m.groupby("acad_month")["mid_month_doy"].first().reindex(x).values.astype(float)
+    daily = day_length(52.5, np.arange(1, 366))
+    winter, summer = float(np.argmin(daily) + 1), float(np.argmax(daily) + 1)
+    pos_w = 4 + (winter - doy_mid[3]) / 31          # December (x = 4) to January (x = 5)
+    pos_s = 10 + (summer - doy_mid[9]) / 30         # June (x = 10) to July (x = 11)
+    return [(0.5, pos_w), (pos_s, 11.5)]
+
+
+SHORT_SPANS = shortening_spans()
+
+
+def shade_shortening(ax, labels=False, fontsize=6):
+    for a, b in SHORT_SPANS:
+        ax.axvspan(a, b, color="#f0efec", lw=0, zorder=0)
+    if labels:
+        tr = ax.get_xaxis_transform()
+        ax.text(sum(SHORT_SPANS[0]) / 2, 0.98, "days shortening", transform=tr, ha="center", va="top", fontsize=fontsize, color=INK2)
+        ax.text((SHORT_SPANS[0][1] + SHORT_SPANS[1][0]) / 2, 0.98, "days lengthening", transform=tr, ha="center", va="top",
+                fontsize=fontsize, color=INK2)
+        ax.text(sum(SHORT_SPANS[1]) / 2, 0.98, "short-\nening", transform=tr, ha="center", va="top", fontsize=fontsize - 0.5,
+                color=INK2, linespacing=0.9)
+
+
 # ===========================================================================
 # Figure 1. When children are measured, and day length through the school year
 # ===========================================================================
@@ -72,6 +98,7 @@ panels = [("pct_underweight", "Underweight"), ("pct_owob", "Overweight + obesity
           ("pct_severe", "Severe obesity"), ("z_mean", "Mean BMI z-score")]
 for i, (col, title) in enumerate(panels):
     ax = fig.add_subplot(gs[i // 3, i % 3])
+    shade_shortening(ax)
     for c in COHORTS:
         mean, ci = deviation_from_year_mean(m[m.cohort == c], col)
         off = -0.12 if c == "Reception" else 0.12
@@ -82,7 +109,10 @@ for i, (col, title) in enumerate(panels):
     ax.set_ylabel("Deviation from year mean (SD)" if col == "z_mean" else "Deviation from year mean (pp)")
     titled(ax, "ABCDE"[i], title)
     if i == 0:
-        ax.legend(loc="upper left")
+        from matplotlib.patches import Patch
+        h, l_ = ax.get_legend_handles_labels()
+        fig.legend(h + [Patch(facecolor="#f0efec", edgecolor=AXIS, lw=0.5)], l_ + ["days shortening"], loc="lower left",
+                   bbox_to_anchor=(0.1, -0.035), ncol=3, fontsize=7)
 
 # Panel F: observed change over the autumn term (Sep->Dec) vs change predicted by a shift of the mean alone
 shift = pd.read_csv(OUT_TAB / "monthly_distribution_shift.csv")
@@ -127,35 +157,24 @@ def fitted_profile(cohort, col, X):
     return Xd @ b + piv.values.mean()
 
 
-fig = plt.figure(figsize=(DOUBLE_COL_IN, 5.5))
-gs = fig.add_gridspec(2, 2, hspace=0.6, wspace=0.34)
-for k, c in enumerate(COHORTS):
-    ax = fig.add_subplot(gs[0, k])
-    mm_ = means[(means.cohort == c) & (means.outcome == "obese")].sort_values("acad_month")
-    ax.axvspan(0.5, 4.5, color="#f0efec", lw=0)
-    ax.text(2.5, 0.98, "days shortening", transform=ax.get_xaxis_transform(), ha="center", va="top", fontsize=6,
-            color=INK2)
-    ax.text(8, 0.98, "days lengthening", transform=ax.get_xaxis_transform(), ha="center", va="top", fontsize=6,
-            color=INK2)
-    knot = MONTH_NUM[shape.loc[(c, "pct_obese"), "end_of_decline"]]
-    apr = (x == 8).astype(float)
-    fit_knot = fitted_profile(c, "pct_obese", np.column_stack([np.minimum(x, knot), apr]).astype(float))
-    fit_lin = fitted_profile(c, "pct_obese", x[:, None].astype(float))
-    ax.plot(x, fit_lin, color=MUTED, lw=1.0, ls=(0, (4, 2)), zorder=2, label="single linear trend")
-    ax.plot(x, fit_knot, color=INK2, lw=1.1, zorder=2,
-            label=f"decline to {MONTH_ABBR[knot - 1]}, then level (+ April)")
-    ax.errorbar(x, mm_.level, yerr=mm_.ci95, fmt="o", color=COHORT_COLOUR[c], ms=4, elinewidth=0.8, capsize=0,
-                zorder=3)
-    ax.set_xticks(x, MONTH_ABBR)
-    ax.tick_params(axis="x", labelsize=6.5)
-    lo, hi = ax.get_ylim()
-    ax.set_ylim(lo, hi + 0.18 * (hi - lo))
-    ax.set_ylabel("Obesity prevalence (%), year-adjusted")
-    titled(ax, "AB"[k], f"{c} obesity, by month measured")
-    ax.legend(loc="lower left", fontsize=6.3)
+fig = plt.figure(figsize=(DOUBLE_COL_IN, 7.9))
+gs = fig.add_gridspec(3, 2, hspace=0.62, wspace=0.34)
+for r_, c in enumerate(COHORTS):
+    for k, (cat, lab) in enumerate((("obese", "obesity"), ("underweight", "underweight"))):
+        ax = fig.add_subplot(gs[r_, k])
+        mm_ = means[(means.cohort == c) & (means.outcome == cat)].sort_values("acad_month")
+        shade_shortening(ax, labels=True)
+        ax.errorbar(x, mm_.level, yerr=mm_.ci95, fmt="-o", color=COHORT_COLOUR[c], ms=3.8, lw=1.0, elinewidth=0.8,
+                    capsize=0, zorder=3)
+        ax.set_xticks(x, MONTH_ABBR)
+        ax.tick_params(axis="x", labelsize=6.3)
+        lo, hi = ax.get_ylim()
+        ax.set_ylim(lo, hi + 0.2 * (hi - lo))
+        ax.set_ylabel(f"{lab.capitalize()} (%), year-adjusted")
+        titled(ax, "ABCD"[2 * r_ + k], f"{c} {lab}, by month measured")
 
-# C: spring profiles in years with an early and a late Easter (both cohorts averaged)
-ax = fig.add_subplot(gs[1, 0])
+# E: spring profiles in years with an early and a late Easter (both cohorts averaged)
+ax = fig.add_subplot(gs[2, 0])
 sp = spring[(spring.cohort == "both") & (spring.outcome == "pct_obese")]
 dates = R["temporal"]["easter"]
 
@@ -176,11 +195,11 @@ for grp, st in styles.items():
 ax.axhline(0, color=AXIS, lw=0.8)
 ax.set_xticks(range(5, 12), MONTH_ABBR[4:])
 ax.set_ylabel("Obesity, deviation from Jan-Jul mean (pp)")
-titled(ax, "C", "Obesity, January to July, by date of Easter")
+titled(ax, "E", "Obesity, January to July, by date of Easter")
 ax.legend(loc="lower left", fontsize=6.3)
 
-# D: April minus May against the date of Easter
-ax = fig.add_subplot(gs[1, 1])
+# F: April minus May against the date of Easter
+ax = fig.add_subplot(gs[2, 1])
 v = east["both|pct_obese|apr_minus_may"]
 is_early = east.easter_doy < dates["median_easter_doy"]
 ax.scatter(east.easter_doy[is_early], v[is_early], s=26, color=INK, zorder=3)
@@ -194,11 +213,11 @@ ax.set_xticks([d.timetuple().tm_yday for d in tick_dates], [d.strftime("%-d %b")
 t = etests.loc[("both", "pct_obese")]
 lo, hi = ax.get_ylim()
 ax.set_ylim(lo, hi + 0.3 * (hi - lo))
-ax.text(0.97, 0.97, f"r = {t.r_easter:.2f}, permutation p = {t.p_easter_permutation:.3f}; 12 school years",
+ax.text(0.97, 0.97, f"r = {t.r_easter:.2f}, permutation p = {t.p_easter_permutation:.3f}; 12 school years".replace("-", "−"),
         transform=ax.transAxes, ha="right", va="top", fontsize=6.5, color=INK2)
 ax.set_xlabel("Date of Easter Sunday")
 ax.set_ylabel("Obesity, April minus May (pp)")
-titled(ax, "D", "April minus May, by date of Easter")
+titled(ax, "F", "April minus May, by date of Easter")
 save(fig, "Figure_3_within_year_shape_and_easter")
 
 # ===========================================================================

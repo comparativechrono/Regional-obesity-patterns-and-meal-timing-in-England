@@ -1,4 +1,4 @@
-"""Step 7: formatted tables for the manuscript (main Tables 1-4, supplementary Tables S1-S11).
+"""Step 7: formatted tables for the manuscript (main Tables 1-4, supplementary Tables S1-S12).
 
 Every number is read from outputs/ (results.json and the analysis tables) -- nothing is typed in.
 Writes outputs/tables/formatted/*.csv and one workbook, outputs/tables/manuscript_tables.xlsx.
@@ -80,7 +80,7 @@ for k, lab in (("pct_asian", "Asian"), ("pct_black", "Black"), ("pct_mixed", "Mi
 tables["Table_1_data"] = pd.DataFrame(rows, columns=["", "Reception (age 4-5)", "Year 6 (age 10-11)"])
 
 # ---------------------------------------------------------------------------
-# Table 2. Within-year change by period, and the spring peak
+# Table 2. Change while days are shortening and while they are lengthening; the April peak
 # ---------------------------------------------------------------------------
 wy = pd.read_csv(OUT_TAB / "monthly_within_year_change.csv")
 rows = []
@@ -88,29 +88,40 @@ for c in COHORTS:
     for cat in ["underweight", "owob", "obese", "severe", "z_mean", "z_sd"]:
         t = wy[(wy.cohort == c) & (wy.outcome == cat)].iloc[0]
         d = 3 if cat.startswith("z_") else 2
-        cells = [c, LABELS[cat], f"{t['mean']:.{d}f}"]
-        for name in ("sep_dec", "jan_mar", "may_jul"):
-            cells.append(est_ci(t[f"slope_{name}"], t[f"ci_low_{name}"], t[f"ci_high_{name}"], d + 1))
-        cells.append(f"{est_ci(t.april_peak, t.april_peak_ci_low, t.april_peak_ci_high, d)}; {int(t.april_peak_n_positive)}/12")
-        rows.append(cells)
+        rows.append([c, LABELS[cat], f"{t['mean']:.{d}f}",
+                     est_ci(t.chg_short, t.chg_short_ci_low, t.chg_short_ci_high, d + 1),
+                     est_ci(t.chg_long, t.chg_long_ci_low, t.chg_long_ci_high, d + 1),
+                     f"{p_fmt(t.p_short_vs_long)}; {int(t.n_years_same_direction)}/12",
+                     f"{est_ci(t.april_peak, t.april_peak_ci_low, t.april_peak_ci_high, d)}; {int(t.april_peak_n_positive)}/12"])
 tables["Table_2_within_year"] = pd.DataFrame(rows, columns=[
-    "Cohort", "Outcome", "Mean (% or z)", "Sep-Dec: change per month (95% CI)", "Jan-Mar: change per month (95% CI)",
-    "May-Jul: change per month (95% CI)", "April vs mean of March and May (95% CI); years higher"])
+    "Cohort", "Outcome", "Mean (% or z)", "Days shortening: change per month (95% CI)",
+    "Days lengthening: change per month (95% CI)", "Difference: p; years in that direction",
+    "April minus mean of March and May (95% CI); years higher"])
 
 # ---------------------------------------------------------------------------
-# Table 3. Shape of the within-year change: comparison of forms (delta AIC)
+# Table 3. The shortening-days model
 # ---------------------------------------------------------------------------
 shape = pd.read_csv(OUT_TAB / "monthly_shape_comparison.csv")
+coh = pd.read_csv(OUT_TAB / "monthly_shortening_cohort_comparison.csv").set_index("outcome")
+OUTC = {"pct_obese": "obese", "pct_owob": "owob", "pct_underweight": "underweight", "z_mean": "z_mean"}
 all_forms = [c[4:] for c in shape.columns if c.startswith("aic_")]
-forms = all_forms
 rows = []
-for _, r in shape.iterrows():
-    best = min(r[f"aic_{f}"] for f in all_forms)
-    rows.append([r.cohort, LABELS[r.outcome]] + [f"{r[f'aic_{f}'] - best:.1f}" for f in forms] +
-                [f"{r.end_of_decline} ({100 * r.end_of_decline_boot_dec_or_jan:.0f}%)", p_fmt(r.lack_of_fit_p)])
-tables["Table_3_within_year_shape"] = pd.DataFrame(rows, columns=[
-    "Cohort", "Outcome"] + [f"dAIC: {f}" for f in forms] + [
-    "End of decline (bootstrap % December or January)", "Decline, then level + April vs month effects: lack-of-fit p"])
+for c in COHORTS:
+    for y, cat in OUTC.items():
+        t = wy[(wy.cohort == c) & (wy.outcome == cat)].iloc[0]
+        sr = shape[(shape.cohort == c) & (shape.outcome == y)].iloc[0]
+        d = 4 if cat == "z_mean" else 2
+        aic = {f: sr[f"aic_{f}"] for f in all_forms}
+        rows.append([c, LABELS[cat], f"{est_ci(t.per_short, t.per_short_ci_low, t.per_short_ci_high, d)}; {p_fmt(t.per_short_p)}",
+                     f"{est_ci(t.steady, t.steady_ci_low, t.steady_ci_high, d)}; {p_fmt(t.steady_p)}",
+                     p_fmt(coh.loc[y, "p_cohort_difference"]),
+                     f"{aic['single linear trend'] - aic['shortening days + linear trend + April']:.1f}",
+                     f"{aic['shortening days + linear trend + April'] - aic['month effects']:+.1f}",
+                     p_fmt(sr.lack_of_fit_p)])
+tables["Table_3_shortening_days_model"] = pd.DataFrame(rows, columns=[
+    "Cohort", "Outcome", "Change per month of shortening days (95% CI); p", "Steady change per school month (95% CI); p",
+    "Same rate in both cohorts: p", "AIC improvement over a single linear trend", "AIC relative to month effects",
+    "Lack of fit vs month effects: p"])
 
 # ---------------------------------------------------------------------------
 # Table 4. Latitude coefficients, 2023/24-2025/26 pooled, Models A and B
@@ -211,18 +222,18 @@ tables["Table_S8_photoperiod_model_check"] = pd.DataFrame(val)
 sens = pd.read_csv(OUT_TAB / "monthly_sensitivity.csv")
 
 
-def sl(r, col):
-    return f"{r[col]:+.3f} ({p_fmt(r[col + '|p'])})" if pd.notna(r.get(col)) else ""
+def sl(r, col, d=3):
+    return f"{r[col]:+.{d}f} ({p_fmt(r[col + '|p'])})" if pd.notna(r.get(col)) else ""
 
 
 tables["Table_S9_temporal_sensitivity"] = pd.DataFrame({
     "Sample": sens["sample"], "Months per cohort": sens.months_per_cohort,
-    "Reception obesity: Sep-Dec (p)": sens.apply(lambda r: sl(r, "Reception|pct_obese|sep_dec"), axis=1),
-    "Reception obesity: Jan-Jul (p)": sens.apply(lambda r: sl(r, "Reception|pct_obese|jan_jul"), axis=1),
-    "Year 6 obesity: Sep-Dec (p)": sens.apply(lambda r: sl(r, "Year 6|pct_obese|sep_dec"), axis=1),
-    "Year 6 obesity: Jan-Jul (p)": sens.apply(lambda r: sl(r, "Year 6|pct_obese|jan_jul"), axis=1),
-    "Reception mean z: Sep-Dec (p)": sens.apply(lambda r: f"{r['Reception|z_mean|sep_dec']:+.4f} ({p_fmt(r['Reception|z_mean|sep_dec|p'])})", axis=1),
-    "Year 6 mean z: Sep-Dec (p)": sens.apply(lambda r: f"{r['Year 6|z_mean|sep_dec']:+.4f} ({p_fmt(r['Year 6|z_mean|sep_dec|p'])})", axis=1),
+    "Reception mean z: per month of shortening days (p)": sens.apply(lambda r: sl(r, "Reception|z_mean|per_short", 4), axis=1),
+    "Reception mean z: steady change (p)": sens.apply(lambda r: sl(r, "Reception|z_mean|steady", 4), axis=1),
+    "Year 6 mean z: per month of shortening days (p)": sens.apply(lambda r: sl(r, "Year 6|z_mean|per_short", 4), axis=1),
+    "Reception obesity: per month of shortening days (p)": sens.apply(lambda r: sl(r, "Reception|pct_obese|per_short"), axis=1),
+    "Year 6 obesity: per month of shortening days (p)": sens.apply(lambda r: sl(r, "Year 6|pct_obese|per_short"), axis=1),
+    "Year 6 underweight: per month of shortening days (p)": sens.apply(lambda r: sl(r, "Year 6|pct_underweight|per_short"), axis=1),
     "Shared month pattern, mean z: F (p)": sens.apply(
         lambda r: f"{r.F_shared_z:.1f} ({p_fmt(r.p_shared_z)})" if pd.notna(r.F_shared_z) else "", axis=1)})
 
@@ -246,6 +257,14 @@ tables["Table_S11_easter_tests"] = pd.DataFrame({
     "Difference (p)": et.apply(lambda r: f"{r.early_minus_late:+.3f} ({p_fmt(r.p_early_vs_late)})", axis=1),
     "r with date British Summer Time began": et.r_bst_start.map(lambda v: f"{v:+.2f}")})
 
+rows = []
+for _, r in shape.iterrows():
+    best = min(r[f"aic_{f}"] for f in all_forms)
+    rows.append([r.cohort, LABELS[r.outcome]] + [f"{r[f'aic_{f}'] - best:.1f}" for f in all_forms] +
+                [f"{r.end_of_decline} ({100 * r.end_of_decline_boot_dec_or_jan:.0f}%)"])
+tables["Table_S12_within_year_forms"] = pd.DataFrame(rows, columns=["Cohort", "Outcome"] + [f"dAIC: {f}" for f in all_forms] +
+                                                     ["Decline, then level: end month (bootstrap % December or January)"])
+
 # ---------------------------------------------------------------------------
 # Write
 # ---------------------------------------------------------------------------
@@ -264,7 +283,7 @@ with pd.ExcelWriter(OUT_TAB / "manuscript_tables.xlsx") as xl:
 print("wrote", len(tables), "tables:", ", ".join(tables))
 pd.set_option("display.width", 250)
 pd.set_option("display.max_colwidth", 60)
-for name in ["Table_2_within_year", "Table_3_within_year_shape", "Table_4_latitude", "Table_S7_shared_and_cohort_specific",
-             "Table_S9_temporal_sensitivity", "Table_S11_easter_tests"]:
+for name in ["Table_2_within_year", "Table_3_shortening_days_model", "Table_4_latitude", "Table_S9_temporal_sensitivity",
+             "Table_S12_within_year_forms"]:
     print("\n" + name)
     print(tables[name].to_string(index=False))

@@ -31,20 +31,23 @@ All numbers are read from `outputs/results.json` and `outputs/tables/`.
 * **When children are measured.** 22% of Reception children are measured in September–December,
   46% in January–March and 31% in April–July (modal month March). Year 6 is measured earlier in the
   year: 41% / 35% / 24% (modal month November).
-* **The decline is confined to the autumn term.** Reception obesity prevalence falls by 0.39
-  percentage points (pp) per month from September to December (95% CI 0.21–0.58), while days are
-  shortening. It is then level: −0.01 pp per month from January to March (−0.13 to +0.10). Year 6
-  shows the same shape, but smaller: −0.16 pp per month in the autumn term and +0.01 from January
-  to March. Mean BMI z-score falls in the autumn term in both cohorts. It is level from January
-  to March, and falls again from May to July as the distribution widens.
-* **A single linear school-year trend is the wrong shape.** For Reception obesity, the best-fitting
-  form is a decline that ends in January, with a peak in April (ΔAIC 56 against a linear trend).
-  It fits as well as unrestricted month effects (lack of fit p = 0.80). In bootstrap resamples of
-  school years, the decline ended in December or January in 80%.
-* **The two cohorts share the month-to-month pattern.** After allowing each cohort its own linear
-  change, the non-linear pattern in mean BMI z-score is the same in Reception and Year 6 (r = 0.95;
-  test of a difference p = 0.88). It is lowest in December and highest in April. The same calendar
-  pattern appears in children six years apart in age.
+* **The BMI distribution moves down while days are shortening.** Between consecutive months, days
+  shorten from September to December and again from June to July, after the summer solstice. They
+  lengthen from December to June. Mean BMI z-score changes by −0.024 SD per month while days shorten
+  and −0.005 while they lengthen in Reception (p = 0.001), and by −0.015 and −0.001 in Year 6
+  (p = 0.002). Overweight and obesity fall in the shortening months.
+* **Underweight is the mirror image.** It rises while days shorten (Year 6: +0.10 pp per month,
+  against +0.01 while they lengthen, in all 12 years). It is highest in midwinter (January in Year 6)
+  and again in July, when overweight and obesity are lowest. Its month-to-month pattern correlates
+  r = −0.98 (Year 6) and −0.87 (Reception) with mean BMI z-score.
+* **The same rate of change per month of shortening days in both cohorts.** In a model with a term
+  for months of shortening days elapsed since mid-September, mean BMI z-score falls 0.016 SD per
+  month of shortening in Reception and 0.014 in Year 6 (difference p = 0.60).
+  * Year 6 shows no other change (steady trend −0.0005 SD per month, p = 0.70).
+  * Reception also declines steadily through the year (−0.006 SD per month).
+  * This form fits far better than a single linear school-year trend: AIC lower by 27 to 51 units
+    for mean z and obesity.
+  * For Year 6 obesity and overweight it fits better than unrestricted month effects.
 * **The spring peak follows Easter, not the sun.** Reception obesity is 0.37 pp (0.13–0.61) higher
   in April than the mean of March and May, in 10 of 12 years. In years when Easter fell between
   23 March and 5 April, the peak was in April. When Easter fell between 8 and 24 April, it moved
@@ -78,10 +81,10 @@ src/
   01_build_la_dataset.py       local-authority dataset: prevalence, IMD, ethnicity, latitude, region
   02_build_monthly_series.py   national monthly series from NHS Digital Tables 3-4
   03_geographic_analysis.py    pooled latitude models A and B, robustness, spatial checks, single years
-  04_temporal_analysis.py      timing, within-year change by period, shape, shared pattern, Easter
+  04_temporal_analysis.py      timing, change while days shorten/lengthen, shortening-days model, Easter
   05_figures_main.py           Figures 1-6
   06_figures_supplementary.py  Figures S1-S10
-  07_tables.py                 formatted Tables 1-4 and S1-S11
+  07_tables.py                 formatted Tables 1-4 and S1-S12
   photoperiod.py               stand-alone day length / sunrise / sunset calculator
 outputs/
   data/                        analysis datasets (LA x year; national monthly series)
@@ -117,7 +120,7 @@ Figures use the Inter typeface if it is installed and fall back to Arial or Deja
 | Figure 5 | `outputs/figures/Figure_5_latitude_coefficients` |
 | Figure 6 | `outputs/figures/Figure_6_residual_maps` |
 | Figures S1–S10 | `outputs/figures/Figure_S*` |
-| Tables 1–4, S1–S11 | `outputs/tables/formatted/*.csv` and `outputs/tables/manuscript_tables.xlsx` |
+| Tables 1–4, S1–S12 | `outputs/tables/formatted/*.csv` and `outputs/tables/manuscript_tables.xlsx` |
 
 ## Photoperiod calculator
 
@@ -144,11 +147,15 @@ and sunset agree with the `astral` package to within one minute.
   perfectly collinear with latitude (r = 0.999), so latitude is used.
 * **Monthly series.** School-year fixed effects throughout, so July of one year is never linked
   to September of the next (a new cohort). Standard errors are clustered by school year.
-  * Change within periods: September–December (days shortening), January–March and May–July.
+  * Change while days shorten (mid-September to mid-December, mid-June to mid-July) against change
+    while they lengthen, from month-to-month differences within each school year.
+  * The shortening-days model: months of shortening days elapsed since mid-September (counted day
+    by day at 52.5°N), a steady linear change and an April term. Its rate is compared between
+    cohorts.
   * The April peak, compared with March and May.
-  * The shape of the within-year change, comparing four forms by AIC: a single linear trend; a
-    decline that ends at an estimated month and is then level; a linear trend plus day length; and
-    unrestricted month effects.
+  * The shape of the within-year change, comparing six forms by AIC: a single linear trend; a
+    decline that ends at an estimated month and is then level; the shortening-days forms; a linear
+    trend plus day length; and unrestricted month effects.
   * The month pattern shared by the two cohorts, after each cohort's own linear change.
   * Location (mean) and spread (SD) of the BMI z-score distribution, recovered from the four UK90
     cut-points by probit regression.

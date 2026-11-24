@@ -71,6 +71,10 @@ def test_tables_agree_with_results_registry():
     for _, row in wy.iterrows():
         stored = r["temporal"]["within_year"][f"{row.cohort}|{row.outcome}"]
         assert stored["slope_sep_dec"] == pytest.approx(row.slope_sep_dec)
+        assert stored["per_short"] == pytest.approx(row.per_short)
+        assert stored["chg_short"] == pytest.approx(row.chg_short)
+    # days shorten between mid-September and mid-December, and between mid-June and mid-July
+    assert r["temporal"]["shortening_intervals"] == ["Sep-Oct", "Oct-Nov", "Nov-Dec", "Jun-Jul"]
 
 
 @built
