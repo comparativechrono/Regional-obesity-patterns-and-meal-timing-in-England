@@ -1,4 +1,4 @@
-"""Step 7: formatted tables for the manuscript (main Tables 1-4, supplementary Tables S1-S12).
+"""Step 7: formatted tables for the manuscript (main Tables 1-4, supplementary Tables S1-S13).
 
 Every number is read from outputs/ (results.json and the analysis tables) -- nothing is typed in.
 Writes outputs/tables/formatted/*.csv and one workbook, outputs/tables/manuscript_tables.xlsx.
@@ -264,6 +264,20 @@ for _, r in shape.iterrows():
                 [f"{r.end_of_decline} ({100 * r.end_of_decline_boot_dec_or_jan:.0f}%)"])
 tables["Table_S12_within_year_forms"] = pd.DataFrame(rows, columns=["Cohort", "Outcome"] + [f"dAIC: {f}" for f in all_forms] +
                                                      ["Decline, then level: end month (bootstrap % December or January)"])
+
+ic = pd.read_csv(OUT_TAB / "monthly_interval_changes.csv")
+rows = []
+for c in COHORTS:
+    for interval in ic.interval.unique():
+        sub = ic[(ic.cohort == c) & (ic.interval == interval)].set_index("outcome")
+        row = [c, interval.replace("-", " to "), f"{sub.iloc[0].day_length_change_h:+.2f}"]
+        for y, d in (("z_mean", 3), ("pct_owob", 2), ("pct_obese", 2), ("pct_underweight", 2)):
+            r = sub.loc[y]
+            row.append(est_ci(r.change, r.ci_low, r.ci_high, d))
+        rows.append(row)
+tables["Table_S13_month_to_month_change"] = pd.DataFrame(rows, columns=[
+    "Cohort", "Interval", "Change in day length, h", "Mean BMI z-score (95% CI)", "Overweight incl. obesity, pp (95% CI)",
+    "Obesity, pp (95% CI)", "Underweight, pp (95% CI)"])
 
 # ---------------------------------------------------------------------------
 # Write

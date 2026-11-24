@@ -3314,6 +3314,18 @@
     "probit_fit_rmse_max": 0.14495557469400763
   },
   "temporal": {
+    "day_length_change_by_interval": {
+      "Apr-May": 1.821928532438779,
+      "Dec-Jan": 0.458161892406876,
+      "Feb-Mar": 1.9544822679307945,
+      "Jan-Feb": 1.710097935120121,
+      "Jun-Jul": -0.4507541695306756,
+      "Mar-Apr": 2.107545171726695,
+      "May-Jun": 1.047673813129979,
+      "Nov-Dec": -1.110436689059167,
+      "Oct-Nov": -1.9301294718593613,
+      "Sep-Oct": -2.0248404417726444
+    },
     "decomposition": {
       "pct_obese": {
         "F_cohort_diff": 2.0162999478225285,
@@ -3868,6 +3880,248 @@
           "r_leave_one_out_min": 0.004898162964998096
         }
       ]
+    },
+    "interval_contrasts": {
+      "Reception|pct_obese|Dec-Jan vs Nov-Dec": {
+        "cohort": "Reception",
+        "contrast": "Dec-Jan vs Nov-Dec",
+        "difference": 0.29386906856666667,
+        "earlier": -0.5624640413750001,
+        "later": -0.2685949728083334,
+        "n_years_same_direction": 7,
+        "outcome": "pct_obese",
+        "p": 0.057825224646307266
+      },
+      "Reception|pct_obese|Jun-Jul vs May-Jun": {
+        "cohort": "Reception",
+        "contrast": "Jun-Jul vs May-Jun",
+        "difference": 0.06052252877500012,
+        "earlier": -0.13261558345833357,
+        "later": -0.07209305468333345,
+        "n_years_same_direction": 6,
+        "outcome": "pct_obese",
+        "p": 0.7280044552997857
+      },
+      "Reception|pct_obese|Nov-Dec vs Oct-Nov": {
+        "cohort": "Reception",
+        "contrast": "Nov-Dec vs Oct-Nov",
+        "difference": -0.19154820831666677,
+        "earlier": -0.37091583305833326,
+        "later": -0.5624640413750001,
+        "n_years_same_direction": 8,
+        "outcome": "pct_obese",
+        "p": 0.18639177799664028
+      },
+      "Reception|pct_owob|Dec-Jan vs Nov-Dec": {
+        "cohort": "Reception",
+        "contrast": "Dec-Jan vs Nov-Dec",
+        "difference": 0.6341655702499995,
+        "earlier": -1.09671622675,
+        "later": -0.4625506565000004,
+        "n_years_same_direction": 10,
+        "outcome": "pct_owob",
+        "p": 0.0062997949930986155
+      },
+      "Reception|pct_owob|Jun-Jul vs May-Jun": {
+        "cohort": "Reception",
+        "contrast": "Jun-Jul vs May-Jun",
+        "difference": 0.0012361495833343266,
+        "earlier": -0.720465298833334,
+        "later": -0.7192291492499997,
+        "n_years_same_direction": 5,
+        "outcome": "pct_owob",
+        "p": 0.9958451681734088
+      },
+      "Reception|pct_owob|Nov-Dec vs Oct-Nov": {
+        "cohort": "Reception",
+        "contrast": "Nov-Dec vs Oct-Nov",
+        "difference": -0.6737912481666667,
+        "earlier": -0.4229249785833333,
+        "later": -1.09671622675,
+        "n_years_same_direction": 9,
+        "outcome": "pct_owob",
+        "p": 0.018336161910975347
+      },
+      "Reception|pct_underweight|Dec-Jan vs Nov-Dec": {
+        "cohort": "Reception",
+        "contrast": "Dec-Jan vs Nov-Dec",
+        "difference": -0.20650682789166672,
+        "earlier": 0.13198455948333335,
+        "later": -0.07452226840833334,
+        "n_years_same_direction": 11,
+        "outcome": "pct_underweight",
+        "p": 0.002819799236788749
+      },
+      "Reception|pct_underweight|Jun-Jul vs May-Jun": {
+        "cohort": "Reception",
+        "contrast": "Jun-Jul vs May-Jun",
+        "difference": 0.09631807272500004,
+        "earlier": 0.11130436099166667,
+        "later": 0.20762243371666667,
+        "n_years_same_direction": 7,
+        "outcome": "pct_underweight",
+        "p": 0.12344011845533986
+      },
+      "Reception|pct_underweight|Nov-Dec vs Oct-Nov": {
+        "cohort": "Reception",
+        "contrast": "Nov-Dec vs Oct-Nov",
+        "difference": 0.09597316320833338,
+        "earlier": 0.036011396274999996,
+        "later": 0.13198455948333335,
+        "n_years_same_direction": 7,
+        "outcome": "pct_underweight",
+        "p": 0.04561435041390726
+      },
+      "Reception|z_mean|Dec-Jan vs Nov-Dec": {
+        "cohort": "Reception",
+        "contrast": "Dec-Jan vs Nov-Dec",
+        "difference": 0.04093567041587468,
+        "earlier": -0.0419863144854564,
+        "later": -0.0010506440695817233,
+        "n_years_same_direction": 11,
+        "outcome": "z_mean",
+        "p": 1.2945063024387066e-05
+      },
+      "Reception|z_mean|Jun-Jul vs May-Jun": {
+        "cohort": "Reception",
+        "contrast": "Jun-Jul vs May-Jun",
+        "difference": -0.009005458567474103,
+        "earlier": -0.022479530107335124,
+        "later": -0.03148498867480923,
+        "n_years_same_direction": 8,
+        "outcome": "z_mean",
+        "p": 0.4303390985527816
+      },
+      "Reception|z_mean|Nov-Dec vs Oct-Nov": {
+        "cohort": "Reception",
+        "contrast": "Nov-Dec vs Oct-Nov",
+        "difference": -0.023843580865474986,
+        "earlier": -0.01814273361998142,
+        "later": -0.0419863144854564,
+        "n_years_same_direction": 10,
+        "outcome": "z_mean",
+        "p": 0.0015843207251887443
+      },
+      "Year 6|pct_obese|Dec-Jan vs Nov-Dec": {
+        "cohort": "Year 6",
+        "contrast": "Dec-Jan vs Nov-Dec",
+        "difference": 0.3038063416666669,
+        "earlier": -0.2191541041666666,
+        "later": 0.08465223750000028,
+        "n_years_same_direction": 8,
+        "outcome": "pct_obese",
+        "p": 0.30299461450483317
+      },
+      "Year 6|pct_obese|Jun-Jul vs May-Jun": {
+        "cohort": "Year 6",
+        "contrast": "Jun-Jul vs May-Jun",
+        "difference": -0.014692508916667476,
+        "earlier": -0.0864195789999999,
+        "later": -0.10111208791666737,
+        "n_years_same_direction": 6,
+        "outcome": "pct_obese",
+        "p": 0.9530213174697163
+      },
+      "Year 6|pct_obese|Nov-Dec vs Oct-Nov": {
+        "cohort": "Year 6",
+        "contrast": "Nov-Dec vs Oct-Nov",
+        "difference": -0.2619672206666663,
+        "earlier": 0.04281311649999964,
+        "later": -0.2191541041666666,
+        "n_years_same_direction": 8,
+        "outcome": "pct_obese",
+        "p": 0.2670897724964421
+      },
+      "Year 6|pct_owob|Dec-Jan vs Nov-Dec": {
+        "cohort": "Year 6",
+        "contrast": "Dec-Jan vs Nov-Dec",
+        "difference": 0.6077369211666674,
+        "earlier": -0.47135327891666634,
+        "later": 0.1363836422500011,
+        "n_years_same_direction": 10,
+        "outcome": "pct_owob",
+        "p": 0.0716509340205427
+      },
+      "Year 6|pct_owob|Jun-Jul vs May-Jun": {
+        "cohort": "Year 6",
+        "contrast": "Jun-Jul vs May-Jun",
+        "difference": 0.039628165833332986,
+        "earlier": -0.22158573766666656,
+        "later": -0.18195757183333358,
+        "n_years_same_direction": 7,
+        "outcome": "pct_owob",
+        "p": 0.814165667641767
+      },
+      "Year 6|pct_owob|Nov-Dec vs Oct-Nov": {
+        "cohort": "Year 6",
+        "contrast": "Nov-Dec vs Oct-Nov",
+        "difference": -0.5747596534166662,
+        "earlier": 0.10340637449999986,
+        "later": -0.47135327891666634,
+        "n_years_same_direction": 10,
+        "outcome": "pct_owob",
+        "p": 0.03295960552748291
+      },
+      "Year 6|pct_underweight|Dec-Jan vs Nov-Dec": {
+        "cohort": "Year 6",
+        "contrast": "Dec-Jan vs Nov-Dec",
+        "difference": -0.07026557563333331,
+        "earlier": 0.1819285938,
+        "later": 0.11166301816666667,
+        "n_years_same_direction": 6,
+        "outcome": "pct_underweight",
+        "p": 0.18917997597140482
+      },
+      "Year 6|pct_underweight|Jun-Jul vs May-Jun": {
+        "cohort": "Year 6",
+        "contrast": "Jun-Jul vs May-Jun",
+        "difference": 0.07584599297500004,
+        "earlier": 0.08912647279166665,
+        "later": 0.16497246576666666,
+        "n_years_same_direction": 8,
+        "outcome": "pct_underweight",
+        "p": 0.272441800234719
+      },
+      "Year 6|pct_underweight|Nov-Dec vs Oct-Nov": {
+        "cohort": "Year 6",
+        "contrast": "Nov-Dec vs Oct-Nov",
+        "difference": 0.13868813249999998,
+        "earlier": 0.04324046130000001,
+        "later": 0.1819285938,
+        "n_years_same_direction": 11,
+        "outcome": "pct_underweight",
+        "p": 0.00028456232764855675
+      },
+      "Year 6|z_mean|Dec-Jan vs Nov-Dec": {
+        "cohort": "Year 6",
+        "contrast": "Dec-Jan vs Nov-Dec",
+        "difference": 0.02331712143029942,
+        "earlier": -0.02969515202272117,
+        "later": -0.006378030592421748,
+        "n_years_same_direction": 10,
+        "outcome": "z_mean",
+        "p": 0.054639529255122915
+      },
+      "Year 6|z_mean|Jun-Jul vs May-Jun": {
+        "cohort": "Year 6",
+        "contrast": "Jun-Jul vs May-Jun",
+        "difference": -0.003201392954032702,
+        "earlier": -0.012696219232342367,
+        "later": -0.01589761218637507,
+        "n_years_same_direction": 7,
+        "outcome": "z_mean",
+        "p": 0.711359997416524
+      },
+      "Year 6|z_mean|Nov-Dec vs Oct-Nov": {
+        "cohort": "Year 6",
+        "contrast": "Nov-Dec vs Oct-Nov",
+        "difference": -0.02675051741580155,
+        "earlier": -0.002944634606919618,
+        "later": -0.02969515202272117,
+        "n_years_same_direction": 10,
+        "outcome": "z_mean",
+        "p": 0.0023297355052638016
+      }
     },
     "mirror": {
       "Reception": {

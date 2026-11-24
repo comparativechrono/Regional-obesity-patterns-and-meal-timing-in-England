@@ -94,3 +94,22 @@ def test_easter_table_covers_complete_school_years():
     assert len(e) == 12 and e.ncmp_year.is_unique
     assert e.easter_doy.between(81, 116).all()                 # Easter falls 22 March to 25 April
     assert pd.to_datetime(e.bst_start).dt.dayofweek.eq(6).all()  # British Summer Time starts on a Sunday
+
+
+@built
+def test_month_to_month_changes_add_up():
+    """Each interval's mean change is the mean over school years of a first difference, so the changes
+    for consecutive intervals must add up to the change between the end months, and the day-length
+    changes must be negative exactly in the shortening intervals."""
+    r = json.loads(RESULTS_JSON.read_text())["temporal"]
+    ic = pd.read_csv(OUT_TAB / "monthly_interval_changes.csv")
+    assert len(ic) == 2 * 4 * 10
+    shortening = sorted(k for k, v in r["day_length_change_by_interval"].items() if v < 0)
+    assert shortening == sorted(r["shortening_intervals"])
+    assert (ic.days.eq("shortening") == ic.day_length_change_h.lt(0)).all()
+    m = pd.read_csv(OUT_DATA / "ncmp_monthly.csv")
+    m = m[m.complete_year & (m.cohort == "Reception")].pivot(index="ncmp_year", columns="acad_month", values="z_mean")
+    autumn = ic[(ic.cohort == "Reception") & (ic.outcome == "z_mean") & ic.interval.isin(["Sep-Oct", "Oct-Nov", "Nov-Dec"])]
+    assert autumn.change.sum() == pytest.approx((m[4] - m[1]).mean())
+    c = r["interval_contrasts"]["Reception|z_mean|Nov-Dec vs Oct-Nov"]
+    assert c["difference"] == pytest.approx(c["later"] - c["earlier"])

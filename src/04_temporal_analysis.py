@@ -175,6 +175,32 @@ for c in COHORTS:
 periods = pd.DataFrame(period_rows)
 periods.to_csv(OUT_TAB / "monthly_within_year_change.csv", index=False)
 
+# Month-to-month change in every interval, and two contrasts: is the autumn fall steepest just before
+# the winter solstice (Nov->Dec vs Oct->Nov), and does the summer-term fall change pace at the summer
+# solstice (Jun->Jul, days shortening, vs May->Jun, days still lengthening)?
+interval_rows, contrast_rows = [], []
+for c in COHORTS:
+    for y in ["z_mean", "pct_owob", "pct_obese", "pct_underweight"]:
+        dif = np.diff(year_by_month(df, c, y).values, axis=1)
+        for i, name in enumerate(INTERVALS):
+            v = dif[:, i]
+            h = stats.t.ppf(0.975, len(v) - 1) * v.std(ddof=1) / np.sqrt(len(v))
+            interval_rows.append({"cohort": c, "outcome": y, "interval": name, "days": "shortening" if SHORT[i] else "lengthening",
+                                  "day_length_change_h": np.diff(D_month)[i],
+                                  "change": v.mean(), "ci_low": v.mean() - h, "ci_high": v.mean() + h})
+        for label, a_, b_ in (("Nov-Dec vs Oct-Nov", 2, 1), ("Jun-Jul vs May-Jun", 9, 8), ("Dec-Jan vs Nov-Dec", 3, 2)):
+            d_ = dif[:, a_] - dif[:, b_]
+            contrast_rows.append({"cohort": c, "outcome": y, "contrast": label, "later": dif[:, a_].mean(),
+                                  "earlier": dif[:, b_].mean(), "difference": d_.mean(),
+                                  "p": stats.ttest_rel(dif[:, a_], dif[:, b_]).pvalue,
+                                  "n_years_same_direction": int((np.sign(d_) == np.sign(d_.mean())).sum())})
+intervals = pd.DataFrame(interval_rows)
+intervals.to_csv(OUT_TAB / "monthly_interval_changes.csv", index=False)
+contrasts = pd.DataFrame(contrast_rows)
+contrasts.to_csv(OUT_TAB / "monthly_interval_contrasts.csv", index=False)
+results["interval_contrasts"] = {f"{r['cohort']}|{r['outcome']}|{r['contrast']}": r for r in contrasts.to_dict(orient="records")}
+results["day_length_change_by_interval"] = dict(zip(INTERVALS, np.diff(D_month)))
+
 # Underweight mirrors the rest of the distribution: correlation of the within-year profiles
 mirror = {}
 for c in COHORTS:
@@ -528,6 +554,7 @@ print(shape[["cohort", "outcome", "end_of_decline", "end_of_decline_boot_mode", 
 print("\nSHORTENING-DAYS COEFFICIENT BY COHORT"); print(joint.round(4).to_string(index=False))
 print("months of shortening elapsed:", dict(zip(ACAD_MONTHS, S_month.round(2))), "shortening intervals:",
       [i for i, sh_ in zip(INTERVALS, SHORT) if sh_])
+print("\nINTERVAL CONTRASTS"); print(contrasts.round(4).to_string(index=False))
 print("\nDISTRIBUTION SHIFT"); print(shift.round(3).to_string(index=False))
 print("\nDECOMPOSITION"); print(decomp.round(4).T.to_string())
 print("\nEASTER"); print(easter_tests.round(3).to_string(index=False))

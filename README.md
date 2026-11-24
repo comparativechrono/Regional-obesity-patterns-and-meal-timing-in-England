@@ -31,22 +31,31 @@ All numbers are read from `outputs/results.json` and `outputs/tables/`.
 * **When children are measured.** 22% of Reception children are measured in September–December,
   46% in January–March and 31% in April–July (modal month March). Year 6 is measured earlier in the
   year: 41% / 35% / 24% (modal month November).
-* **The BMI distribution moves down while days are shortening.** Between consecutive months, days
-  shorten from September to December and again from June to July, after the summer solstice. They
-  lengthen from December to June. Mean BMI z-score changes by −0.024 SD per month while days shorten
+* **The BMI distribution falls in the autumn, most steeply just before the winter solstice.** Mean
+  BMI z-score falls by 0.042 SD from November to December in Reception and 0.030 in Year 6, against
+  0.018 and 0.003 from October to November (paired across the 12 school years, p = 0.002 in both).
+  Days shorten by 1.1 h over that month, against about 2 h in each of the two months before it, so
+  the fall is steepest when days are shortest, not when they shorten fastest. In Year 6, overweight
+  and obesity also fall from September to October. The mean z-score then changes little over the
+  winter (Table S13).
+* **It falls again in the summer term, from May, while days are still lengthening.** The pace is
+  the same before and after the summer solstice (Reception −0.022 and −0.031 SD from May to June and
+  June to July; Year 6 −0.013 and −0.016), so the June–July fall does not by itself point to day
+  length. Averaged over the year, the mean z-score changes by −0.024 SD per month while days shorten
   and −0.005 while they lengthen in Reception (p = 0.001), and by −0.015 and −0.001 in Year 6
-  (p = 0.002). Overweight and obesity fall in the shortening months.
+  (p = 0.002).
 * **Underweight is the mirror image.** It rises while days shorten (Year 6: +0.10 pp per month,
-  against +0.01 while they lengthen, in all 12 years). It is highest in midwinter (January in Year 6)
-  and again in July, when overweight and obesity are lowest. Its month-to-month pattern correlates
-  r = −0.98 (Year 6) and −0.87 (Reception) with mean BMI z-score.
+  against +0.01 while they lengthen, in all 12 years), most steeply from November to December. It is
+  highest in midwinter (January in Year 6) and again in July, when overweight and obesity are lowest.
+  Its month-to-month pattern correlates r = −0.98 (Year 6) and −0.87 (Reception) with mean BMI z-score.
 * **The same rate of change per month of shortening days in both cohorts.** In a model with a term
   for months of shortening days elapsed since mid-September, mean BMI z-score falls 0.016 SD per
-  month of shortening in Reception and 0.014 in Year 6 (difference p = 0.60).
+  month of shortening in Reception and 0.014 in Year 6 (difference p = 0.60). The shortening term is
+  informed mainly by the autumn, because the summer-term fall starts before the summer solstice.
   * Year 6 shows no other change (steady trend −0.0005 SD per month, p = 0.70).
   * Reception also declines steadily through the year (−0.006 SD per month).
-  * This form fits far better than a single linear school-year trend: AIC lower by 27 to 51 units
-    for mean z and obesity.
+  * This form fits far better than a single linear school-year trend: AIC lower by 27 and 33 units
+    for the mean z-score and 51 for Reception obesity.
   * For Year 6 obesity and overweight it fits better than unrestricted month effects.
 * **The spring peak follows Easter, not the sun.** Reception obesity is 0.37 pp (0.13–0.61) higher
   in April than the mean of March and May, in 10 of 12 years. In years when Easter fell between
@@ -55,6 +64,12 @@ All numbers are read from `outputs/results.json` and `outputs/tables/`.
   (r = −0.63, permutation p = 0.034). It does not correlate with the start of British Summer Time
   (r = −0.18). Day length on a given date does not move with Easter, so this feature is tied to
   the school calendar. No comparable peak followed the Christmas holiday.
+* **What the monthly data cannot show.** The timing of the autumn fall is more consistent with a
+  response to short, shortening days than with recovery from the summer holiday. But each month
+  compares different children in different schools, and day length changes together with
+  temperature, weather and time spent outdoors, so these data cannot attribute the fall to day
+  length. The autumn term ends within days of the winter solstice, so timing alone cannot separate
+  the two; a larger autumn fall at higher latitudes, in individual-level data, would.
 * **Latitude and underweight reflect ethnic composition.** In the pooled 2023/24–2025/26 analysis
   adjusted for deprivation only (Model A), underweight is lower further north. The estimates are
   −0.19 pp per degree in Reception and −0.16 in Year 6 (spatial-HAC p = 0.011 and 0.013). Adding the
@@ -81,10 +96,10 @@ src/
   01_build_la_dataset.py       local-authority dataset: prevalence, IMD, ethnicity, latitude, region
   02_build_monthly_series.py   national monthly series from NHS Digital Tables 3-4
   03_geographic_analysis.py    pooled latitude models A and B, robustness, spatial checks, single years
-  04_temporal_analysis.py      timing, change while days shorten/lengthen, shortening-days model, Easter
+  04_temporal_analysis.py      timing, month-to-month change, shortening-days model, Easter
   05_figures_main.py           Figures 1-6
   06_figures_supplementary.py  Figures S1-S10
-  07_tables.py                 formatted Tables 1-4 and S1-S12
+  07_tables.py                 formatted Tables 1-4 and S1-S13
   photoperiod.py               stand-alone day length / sunrise / sunset calculator
 outputs/
   data/                        analysis datasets (LA x year; national monthly series)
@@ -102,7 +117,7 @@ Python 3.10 or later.
 ```bash
 pip install -r requirements.txt
 python run_all.py --clean      # rebuild outputs/ from data/raw/
-python -m pytest tests         # 23 checks: methods, photoperiod model, data integrity
+python -m pytest tests         # 24 checks: methods, photoperiod model, data integrity
 ```
 
 `python run_all.py --download` first re-downloads the API-sourced inputs (step 0). By default the
@@ -120,7 +135,7 @@ Figures use the Inter typeface if it is installed and fall back to Arial or Deja
 | Figure 5 | `outputs/figures/Figure_5_latitude_coefficients` |
 | Figure 6 | `outputs/figures/Figure_6_residual_maps` |
 | Figures S1–S10 | `outputs/figures/Figure_S*` |
-| Tables 1–4, S1–S12 | `outputs/tables/formatted/*.csv` and `outputs/tables/manuscript_tables.xlsx` |
+| Tables 1–4, S1–S13 | `outputs/tables/formatted/*.csv` and `outputs/tables/manuscript_tables.xlsx` |
 
 ## Photoperiod calculator
 
@@ -147,8 +162,11 @@ and sunset agree with the `astral` package to within one minute.
   perfectly collinear with latitude (r = 0.999), so latitude is used.
 * **Monthly series.** School-year fixed effects throughout, so July of one year is never linked
   to September of the next (a new cohort). Standard errors are clustered by school year.
+  * Change between every pair of consecutive months, within each school year, averaged over the 12
+    years (Table S13). Paired comparisons across years ask whether the autumn fall is steepest from
+    November to December and whether the summer-term fall changes pace at the summer solstice.
   * Change while days shorten (mid-September to mid-December, mid-June to mid-July) against change
-    while they lengthen, from month-to-month differences within each school year.
+    while they lengthen.
   * The shortening-days model: months of shortening days elapsed since mid-September (counted day
     by day at 52.5°N), a steady linear change and an April term. Its rate is compared between
     cohorts.
