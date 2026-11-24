@@ -28,7 +28,7 @@ tested with public data only:
 All numbers are read from `outputs/results.json` and `outputs/tables/`.
 
 * **When children are measured.** 22% of Reception children are measured in September–December,
-  47% in January–March and 31% in April–July (modal month March). Year 6 is measured earlier in the year:
+  46% in January–March and 31% in April–July (modal month March). Year 6 is measured earlier in the year:
   41% / 35% / 24% (modal month November).
 * **A school-year shift of the whole distribution.** Reception overweight-including-obesity
   prevalence falls by 0.34 percentage points (pp) per month of the school year (95% CI 0.28–0.40).
