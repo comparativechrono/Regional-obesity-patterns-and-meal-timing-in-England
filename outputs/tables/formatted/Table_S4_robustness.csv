@@ -1,4 +1,4 @@
-year,spec,Reception Underweight,Reception OW+OB,Reception Obesity,Reception Severe obesity,Year 6 Underweight,Year 6 OW+OB,Year 6 Obesity,Year 6 Severe obesity
+NCMP year,Specification,Reception Underweight,Reception OW+OB,Reception Obesity,Reception Severe obesity,Year 6 Underweight,Year 6 OW+OB,Year 6 Obesity,Year 6 Severe obesity
 2023/24,Model A: IMD + latitude,-0.20 (<0.001),+0.37 (0.027),+0.03 (0.66),-0.06 (0.11),-0.13 (<0.001),-0.01 (0.97),-0.06 (0.73),-0.00 (0.97)
 2023/24,IDACI instead of IMD,-0.18 (<0.001),+0.45 (0.006),+0.11 (0.15),-0.03 (0.40),-0.12 (<0.001),+0.16 (0.36),+0.08 (0.61),+0.05 (0.46)
 2023/24,London excluded,-0.11 (0.022),+0.26 (0.16),+0.08 (0.35),+0.01 (0.83),-0.08 (0.010),+0.45 (0.027),+0.39 (0.041),+0.21 (0.005)

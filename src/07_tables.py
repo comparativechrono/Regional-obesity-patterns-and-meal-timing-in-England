@@ -8,7 +8,7 @@ from datetime import date, timedelta
 import numpy as np
 import pandas as pd
 
-from common import (ACAD_MONTHS, INDICATORS, OUT_TAB, PRIMARY_YEAR, YEARS, day_length, load_results)
+from common import (ACAD_MONTHS, INDICATORS, OUT_DATA, OUT_TAB, PRIMARY_YEAR, YEARS, day_length, load_results)
 from photoperiod import compute
 
 FMT = OUT_TAB / "formatted"
@@ -154,23 +154,34 @@ ts = ts[["Reception children measured", "Reception % of year (range across years
 ts["Day length at 52.5 N on the 15th (h)"] = [f"{R['monthly_series']['photoperiod_52_5N_by_month_h'][m]:.1f}" for m in ACAD_MONTHS]
 tables["Table_S1_measurement_timing"] = ts
 
+LABEL = {k: f"{v[1]} {v[3] if v[3] != 'OW+OB' else 'OW+OB'}" for k, v in INDICATORS.items()}
+LA_NAMES = pd.read_csv(OUT_DATA / "la_dataset_2023_24.csv").set_index("la_code")["la_name"]
+
 reorg = pd.read_csv(OUT_TAB / "imd_reorganised_las.csv")
-tables["Table_S2_imd_reorganised_LAs"] = reorg.round(3)
+tables["Table_S2_imd_reorganised_LAs"] = pd.DataFrame({
+    "Authority (code)": [f"{LA_NAMES.get(c, c)} ({c})" for c in reorg.new_code],
+    "Method": reorg.method, "IMD 2019 average score": reorg.imd_score.round(2),
+    "IDACI average score": reorg.idaci_score.round(3)})
 
 sup = pd.read_csv(OUT_TAB / "geo_suppression_bounds_2023_24.csv")
-sup["latitude beta (p)"] = sup.apply(lambda r: f"{r.lat_beta:+.3f} ({p_fmt(r.lat_p)})", axis=1)
-tables["Table_S3_suppression_bounds"] = sup[["model", "indicator", "n_suppressed", "treatment", "n", "latitude beta (p)"]]
+tables["Table_S3_suppression_bounds"] = pd.DataFrame({
+    "Model": sup.model, "Indicator": sup.indicator.map(LABEL), "Values suppressed": sup.n_suppressed,
+    "Treatment of suppressed values": sup.treatment, "Authorities": sup.n,
+    "Latitude β, pp per degree (p)": sup.apply(lambda r: f"{r.lat_beta:+.3f} ({p_fmt(r.lat_p)})", axis=1)})
 
 rob = pd.read_csv(OUT_TAB / "geo_robustness.csv")
 rob["txt"] = rob.apply(lambda r: f"{r.lat_beta:+.2f} ({p_fmt(r.lat_p)})", axis=1)
 rob_w = rob.pivot_table(index=["year", "spec"], columns="indicator", values="txt", aggfunc="first", sort=False)[list(INDICATORS)]
-rob_w.columns = [f"{INDICATORS[k][1]} {INDICATORS[k][3]}" for k in rob_w.columns]
-tables["Table_S4_robustness"] = rob_w.reset_index()
+rob_w.columns = [LABEL[k] for k in rob_w.columns]
+tables["Table_S4_robustness"] = rob_w.reset_index().rename(columns={"year": "NCMP year", "spec": "Specification"})
 
 mor = pd.read_csv(OUT_TAB / "geo_morans_i.csv")
-mor["I without latitude (p)"] = mor.apply(lambda r: f"{r.morans_I_without_latitude:.3f} ({p_fmt(r.p_without_latitude)})", axis=1)
-mor["I with latitude (p)"] = mor.apply(lambda r: f"{r.morans_I_with_latitude:.3f} ({p_fmt(r.p_with_latitude)})", axis=1)
-tables["Table_S5_morans_I"] = mor[["year", "model", "indicator", "I without latitude (p)", "I with latitude (p)"]]
+tables["Table_S5_morans_I"] = pd.DataFrame({
+    "NCMP year": mor.year, "Model": mor.model, "Indicator": mor.indicator.map(LABEL),
+    "Moran's I, model without latitude (p)": mor.apply(
+        lambda r: f"{r.morans_I_without_latitude:.3f} ({p_fmt(r.p_without_latitude)})", axis=1),
+    "Moran's I, model with latitude (p)": mor.apply(
+        lambda r: f"{r.morans_I_with_latitude:.3f} ({p_fmt(r.p_with_latitude)})", axis=1)})
 
 cos = pd.read_csv(OUT_TAB / "monthly_cosinor.csv")
 cos_t = pd.DataFrame({
