@@ -83,7 +83,8 @@ def titled(ax, letter, text):
 
 
 def save(fig, name):
-    for ext in ("png", "pdf"):
-        fig.savefig(OUT_FIG / f"{name}.{ext}")
+    # fixed metadata so that re-running the pipeline produces byte-identical files
+    fig.savefig(OUT_FIG / f"{name}.png", metadata={"Software": None})
+    fig.savefig(OUT_FIG / f"{name}.pdf", metadata={"CreationDate": None, "Producer": None, "Creator": None})
     plt.close(fig)
     print("saved", name)

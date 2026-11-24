@@ -230,6 +230,12 @@ with pd.ExcelWriter(OUT_TAB / "manuscript_tables.xlsx") as xl:
     for name, t in tables.items():
         t.to_csv(FMT / f"{name}.csv", index=False)
         t.to_excel(xl, sheet_name=name[:31], index=False)
+    # fixed document timestamps so that re-running the pipeline produces an identical file
+    from datetime import datetime
+    if hasattr(xl.book, "set_properties"):          # xlsxwriter engine
+        xl.book.set_properties({"created": datetime(2026, 11, 24)})
+    else:                                           # openpyxl engine
+        xl.book.properties.created = xl.book.properties.modified = datetime(2026, 11, 24)
 print("wrote", len(tables), "tables:", ", ".join(tables))
 pd.set_option("display.width", 250)
 pd.set_option("display.max_colwidth", 60)
