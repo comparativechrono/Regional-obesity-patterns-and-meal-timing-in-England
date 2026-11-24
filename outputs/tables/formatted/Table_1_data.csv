@@ -25,7 +25,7 @@ National monthly series (NHS Digital Tables 3-4),,
   Overweight incl. obesity: England % (LA range); LAs analysed,23.8 (16.2-32.3); N = 151,36.9 (24.2-46.0); N = 151
   Obesity incl. severe: England % (LA range); LAs analysed,10.7 (5.2-15.8); N = 151,22.8 (12.4-32.1); N = 151
   Severe obesity: England % (LA range); LAs analysed,3.0 (0.6-5.2); N = 150,5.9 (2.4-10.3); N = 151
-Local-authority covariates (151 LAs),,
+Local-authority characteristics (151 LAs; the same in every year),,
 "  Latitude of LA centroid, degrees N: mean (range)",52.5 (50.4-55.3),
 "  Annual range of day length, hours (range across LAs)",8.4-10.4,
   IMD 2019 average score: mean (range),23.0 (5.8-45.0),

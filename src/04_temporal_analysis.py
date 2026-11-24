@@ -1,32 +1,73 @@
 """Step 4: analysis of the national monthly NCMP series (NHS Digital Tables 3-4).
 
-Primary sample: the 12 complete collection years 2007/08-2018/19 (Sept-July, 132 months
-per cohort). 2019/20 is excluded from the primary analysis because data stop in March
-2020 and March is incomplete (COVID-19 school closures); it is used in a sensitivity check.
+Sample: the 12 complete school years 2007/08-2018/19 (September-July, 132 months per cohort).
+2019/20 stops in March 2020 (COVID-19 school closures) and is used only in a sensitivity check.
+
+Every September a new cohort of children is measured, so each school year is a separate group
+of children: the analyses use school-year fixed effects and never link July of one year to
+September of the next. Within a school year, the month of measurement advances the calendar
+(day length, season, school terms and holidays) and the children's age and time in school
+together. Reception (age 4-5) and Year 6 (age 10-11) are measured under the same calendar but
+at different ages.
 
 Analyses
-  1. When children are measured: share of each cohort measured by month and by term.
-  2. Within-year trend in each BMI category (academic-year fixed effects, standard errors
-     clustered by year), plus Sept-Dec vs Jan-Jul slopes.
-  3. Linear cosinor (fixed 12-month period) with zero-amplitude F test.
-  4. Discriminating model comparison: does photoperiod (or any sinusoid) explain anything
-     once a linear within-school-year trend is allowed for?  Pooled (year FE, clustered SE)
-     and collapsed to the 11 monthly means (the most conservative form).
-  5. Location/scale of the BMI z-score distribution through the year.
-  6. The September reset (July -> following September) as a discriminating test.
+  1. When children are measured.
+  2. The within-year pattern month by month, and its change within periods: the autumn term
+     (September-December, when days shorten), the spring term (January-March), and May-July
+     (after the spring peak); the spring peak (April against March and May).
+  3. The shape of the within-year change: a single linear school-year trend against a decline
+     that stops part-way through the year (end of the decline estimated from the data), a
+     linear trend plus day length, and unrestricted month effects (AIC, BIC).
+  4. Location (mean) and spread (SD) of the BMI z-score distribution during the autumn decline
+     and in May-July.
+  5. Month-to-month pattern shared by the two cohorts and cohort-specific change:
+       y[c, t, m] = a[c, t] + b[c] * m + s[m]
+     s is identified only up to a linear function of m, so the shared component is the
+     non-linear part of the within-year pattern.
+  6. The spring peak and the date of Easter. Easter moves the Easter school holiday by up to
+     five weeks between years; day length on a given date and the start of British Summer Time
+     (last Sunday in March) do not move with it.
+  7. Sensitivity analyses.
 """
+import datetime as dt
+
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
+from dateutil.easter import easter
 from scipy import stats
 
-from common import ACAD_MONTHS, CUTPOINTS, OUT_DATA, OUT_TAB, save_results
+from common import ACAD_MONTHS, CUTPOINTS, OUT_DATA, OUT_TAB, REFERENCE_LATITUDE, day_length, save_results
 
 df_all = pd.read_csv(OUT_DATA / "ncmp_monthly.csv")
-df = df_all[df_all.complete_year].copy()
+df = df_all[df_all.complete_year].copy().reset_index(drop=True)
 CATS = ["underweight", "healthy", "overweight", "obese", "severe", "owob"]
 COHORTS = ["Reception", "Year 6"]
+MONTHS = np.arange(1, 12)
+APRIL, MAY, MARCH = 8, 9, 7
+PERIODS = {"sep_dec": (1, 4), "jan_mar": (5, 7), "may_jul": (9, 11), "jan_jul": (5, 11)}
+SHAPE_OUTCOMES = {"pct_obese": "Obesity", "pct_owob": "Overweight incl. obesity", "pct_underweight": "Underweight",
+                  "z_mean": "Mean BMI z-score"}
+years = sorted(df.ncmp_year.unique())
 results = {}
+rng = np.random.default_rng(20261124)
+
+
+def ycol(cat):
+    return f"pct_{cat}" if cat in CATS else cat
+
+
+def cluster_fit(formula, data):
+    return smf.ols(formula, data=data).fit(cov_type="cluster", cov_kwds={"groups": data["ncmp_year"]})
+
+
+def year_by_month(data, cohort, y):
+    """School years x months matrix for one cohort."""
+    return data[data.cohort == cohort].pivot_table(index="ncmp_year", columns="acad_month", values=y).reindex(years)
+
+
+day = df.groupby("acad_month")["mid_month_doy"].first().reindex(MONTHS).values
+D_month = day_length(REFERENCE_LATITUDE, day)
 
 # ---------------------------------------------------------------------------
 # 1. Measurement timing
@@ -45,7 +86,6 @@ for c in COHORTS:
     for m in ACAD_MONTHS:
         timing.append({"cohort": c, "month": m, "children": int(tot[m]), "share_pct": share[m],
                        "share_min_year": per_year_share[m].min(), "share_max_year": per_year_share[m].max()})
-    # mean measurement position (academic month) and its year-to-year range
     pos = (per_year_share * np.arange(1, 12)).sum(axis=1) / 100
     results.setdefault("timing", {})[c] = {
         "terms_pct": terms, "modal_month": share.idxmax(), "share_by_month_pct": share.round(2).to_dict(),
@@ -56,284 +96,381 @@ timing = pd.DataFrame(timing)
 timing.to_csv(OUT_TAB / "monthly_measurement_timing.csv", index=False)
 
 # ---------------------------------------------------------------------------
-# 2. Within-year trends (year fixed effects; SE clustered by collection year)
+# 2. Within-year pattern: month means, change within periods, the spring peak
 # ---------------------------------------------------------------------------
-def cluster_fit(formula, data):
-    return smf.ols(formula, data=data).fit(cov_type="cluster", cov_kwds={"groups": data["ncmp_year"]})
-
-trend_rows, monthly_means = [], []
+period_rows, monthly_means = [], []
 for c in COHORTS:
     s = df[df.cohort == c]
     for cat in CATS + ["z_mean", "z_sd"]:
-        y = f"pct_{cat}" if cat in CATS else cat
-        f = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month", s)
-        autumn = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month", s[s.acad_month <= 4])
-        rest = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month", s[s.acad_month >= 5])
-        mm = s.groupby("acad_month")[y].agg(["mean", "std", "count"])
-        mm["ci95"] = stats.t.ppf(0.975, mm["count"] - 1) * mm["std"] / np.sqrt(mm["count"])
-        sep_jul = mm.loc[11, "mean"] - mm.loc[1, "mean"]
-        trend_rows.append({"cohort": c, "outcome": cat, "mean": s[y].mean(),
-                           "slope_per_month": f.params["acad_month"], "slope_ci_low": f.conf_int().loc["acad_month", 0],
-                           "slope_ci_high": f.conf_int().loc["acad_month", 1], "slope_p": f.pvalues["acad_month"],
-                           "slope_sep_dec": autumn.params["acad_month"], "p_sep_dec": autumn.pvalues["acad_month"],
-                           "slope_jan_jul": rest.params["acad_month"], "p_jan_jul": rest.pvalues["acad_month"],
-                           "sep_mean": mm.loc[1, "mean"], "jul_mean": mm.loc[11, "mean"], "jul_minus_sep": sep_jul})
-        for m, r in mm.iterrows():
-            monthly_means.append({"cohort": c, "outcome": cat, "acad_month": m, "month": ACAD_MONTHS[m - 1],
-                                  "mean": r["mean"], "ci95": r["ci95"], "n_years": int(r["count"])})
-trends = pd.DataFrame(trend_rows)
-trends.to_csv(OUT_TAB / "monthly_within_year_trends.csv", index=False)
+        y = ycol(cat)
+        row = {"cohort": c, "outcome": cat, "mean": s[y].mean()}
+        for name, (m0, m1) in PERIODS.items():
+            f = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month", s[(s.acad_month >= m0) & (s.acad_month <= m1)])
+            ci = f.conf_int().loc["acad_month"]
+            row.update({f"slope_{name}": f.params["acad_month"], f"ci_low_{name}": ci[0], f"ci_high_{name}": ci[1],
+                        f"p_{name}": f.pvalues["acad_month"]})
+        # autumn slope vs January-July slope: one model, period-specific year effects and slopes
+        s2 = s.assign(autumn=(s.acad_month <= 4).astype(int))
+        j = cluster_fit(f"{y} ~ C(ncmp_year):C(autumn) + acad_month:C(autumn)", s2)
+        row["p_autumn_vs_jan_jul"] = float(j.t_test("acad_month:C(autumn)[1] - acad_month:C(autumn)[0] = 0").pvalue)
+        # a single linear school-year trend, for comparison
+        lin = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month", s)
+        row.update({"slope_linear": lin.params["acad_month"], "p_linear": lin.pvalues["acad_month"]})
+        # spring peak: April against the mean of March and May in the same school year
+        piv = year_by_month(df, c, y)
+        peak = piv[APRIL] - (piv[MARCH] + piv[MAY]) / 2
+        tt = stats.ttest_1samp(peak, 0)
+        half = stats.t.ppf(0.975, len(peak) - 1) * peak.std(ddof=1) / np.sqrt(len(peak))
+        row.update({"april_peak": peak.mean(), "april_peak_ci_low": peak.mean() - half,
+                    "april_peak_ci_high": peak.mean() + half, "april_peak_p": tt.pvalue,
+                    "april_peak_n_positive": int((peak > 0).sum())})
+        # the same contrast after the Christmas holiday: January against December and February
+        jan = piv[5] - (piv[4] + piv[6]) / 2
+        half_j = stats.t.ppf(0.975, len(jan) - 1) * jan.std(ddof=1) / np.sqrt(len(jan))
+        row.update({"january_peak": jan.mean(), "january_peak_ci_low": jan.mean() - half_j,
+                    "january_peak_ci_high": jan.mean() + half_j, "january_peak_p": stats.ttest_1samp(jan, 0).pvalue,
+                    "january_peak_n_positive": int((jan > 0).sum())})
+        # month means: deviation from each school year's mean, and year-adjusted level
+        dev = piv.sub(piv.mean(axis=1), axis=0)
+        for mth in MONTHS:
+            v = dev[mth].dropna()
+            monthly_means.append({"cohort": c, "outcome": cat, "acad_month": mth, "month": ACAD_MONTHS[mth - 1],
+                                  "deviation": v.mean(),
+                                  "ci95": stats.t.ppf(0.975, len(v) - 1) * v.std(ddof=1) / np.sqrt(len(v)),
+                                  "level": v.mean() + piv.values.mean(), "n_years": len(v)})
+        period_rows.append(row)
+periods = pd.DataFrame(period_rows)
+periods.to_csv(OUT_TAB / "monthly_within_year_change.csv", index=False)
 monthly_means = pd.DataFrame(monthly_means)
 monthly_means.to_csv(OUT_TAB / "monthly_means_by_month.csv", index=False)
 
-# ---------------------------------------------------------------------------
-# 3. Linear cosinor, 12-month period (Cornelissen 2014): y = M + b(t - tbar) + a cos + g sin
-# ---------------------------------------------------------------------------
-def cosinor(s, y):
-    d = s.copy()
-    d["tc"] = d["t_years"] - d["t_years"].mean()
-    d["cosw"] = np.cos(2 * np.pi * d["t_years"])
-    d["sinw"] = np.sin(2 * np.pi * d["t_years"])
-    full = smf.ols(f"{y} ~ tc + cosw + sinw", data=d).fit()
-    red = smf.ols(f"{y} ~ tc", data=d).fit()
-    F, p, _ = full.compare_f_test(red)
-    a, g = full.params["cosw"], full.params["sinw"]
-    amp = float(np.hypot(a, g))
-    V = full.cov_params().loc[["cosw", "sinw"], ["cosw", "sinw"]].values
-    grad = np.array([a, g]) / amp
-    amp_se = float(np.sqrt(grad @ V @ grad))
-    acro_years = (np.arctan2(g, a) / (2 * np.pi)) % 1.0          # fraction of calendar year at the peak
-    peak_doy = acro_years * 365.25
-    peak = (pd.Timestamp("2021-01-01") + pd.Timedelta(days=float(peak_doy))).strftime("%d %b")
-    return {"amplitude": amp, "amplitude_ci_low": amp - 1.96 * amp_se, "amplitude_ci_high": amp + 1.96 * amp_se,
-            "peak_date": peak, "peak_doy": float(peak_doy), "trend_per_year": full.params["tc"],
-            "zero_amplitude_F": float(F), "zero_amplitude_p": float(p), "r2": full.rsquared, "aic": full.aic}
 
-cos_rows = []
+# ---------------------------------------------------------------------------
+# 3. Shape of the within-year change (per cohort; school-year fixed effects)
+# ---------------------------------------------------------------------------
+def fit_shape(Y, X):
+    """Y: years x months; X: months x k shape regressors (school-year effects removed by
+    demeaning within year). Returns residual sum of squares and number of parameters."""
+    ok = ~np.isnan(Y)
+    Yd = Y - np.nanmean(Y, axis=1, keepdims=True)
+    rows_, ys = [], []
+    for i in range(Y.shape[0]):
+        Xi = X[ok[i]]
+        rows_.append(Xi - Xi.mean(axis=0, keepdims=True))
+        ys.append(Yd[i, ok[i]] - Yd[i, ok[i]].mean())
+    Xs, ys = np.vstack(rows_), np.concatenate(ys)
+    e = ys - Xs @ np.linalg.lstsq(Xs, ys, rcond=None)[0] if Xs.shape[1] else ys
+    return float(e @ e), Y.shape[0] + X.shape[1], len(ys)
+
+
+def info(ssr, k, n):
+    return n * np.log(ssr / n) + 2 * k, n * np.log(ssr / n) + np.log(n) * k
+
+
+apr = (MONTHS == APRIL).astype(float)[:, None]
+KNOTS = range(2, 11)          # last month of the decline: October ... June
+
+
+def knot_x(k):
+    return np.minimum(MONTHS, k)[:, None].astype(float)
+
+
+def best_knot(Y, with_april=True):
+    fits = [(fit_shape(Y, np.column_stack([knot_x(k), apr]) if with_april else knot_x(k))[0], k) for k in KNOTS]
+    return min(fits)[1]
+
+
+FORMS = {
+    "linear school-year trend": lambda Y: MONTHS[:, None].astype(float),
+    "linear trend + April": lambda Y: np.column_stack([MONTHS, apr]),
+    "decline, then level": lambda Y: knot_x(best_knot(Y, with_april=False)),
+    "decline, then level + April": lambda Y: np.column_stack([knot_x(best_knot(Y)), apr]),
+    "linear trend + day length": lambda Y: np.column_stack([MONTHS, D_month]),
+    "linear trend + day length + April": lambda Y: np.column_stack([MONTHS, D_month, apr]),
+    "month effects": lambda Y: np.eye(11)[:, 1:],
+}
+shape_rows = []
 for c in COHORTS:
-    s = df[df.cohort == c]
-    for cat in CATS:
-        cos_rows.append({"cohort": c, "outcome": cat, **cosinor(s, f"pct_{cat}")})
-cos_tab = pd.DataFrame(cos_rows)
-cos_tab.to_csv(OUT_TAB / "monthly_cosinor.csv", index=False)
+    for y, label in SHAPE_OUTCOMES.items():
+        Y = year_by_month(df, c, y).values
+        row = {"cohort": c, "outcome": y, "label": label}
+        for form, make in FORMS.items():
+            ssr, k, n = fit_shape(Y, make(Y))
+            k += 1 if form.startswith("decline") else 0           # the estimated end of the decline
+            row[f"aic_{form}"], row[f"bic_{form}"] = info(ssr, k, n)
+        row["end_of_decline"] = ACAD_MONTHS[best_knot(Y) - 1]
+        boot = [best_knot(Y[rng.integers(0, len(years), len(years))]) for _ in range(1000)]
+        counts = pd.Series(boot).value_counts(normalize=True)
+        row["end_of_decline_boot_mode"] = ACAD_MONTHS[int(counts.idxmax()) - 1]
+        row["end_of_decline_boot_dec_or_jan"] = float(counts.reindex([4, 5]).fillna(0).sum())
+        row["end_of_decline_boot_range"] = "-".join(ACAD_MONTHS[int(v) - 1][:3] for v in np.percentile(boot, [2.5, 97.5]))
+        # lack of fit of the decline-then-level form against unrestricted month effects
+        kk = best_knot(Y)
+        s_r, k_r, n_ = fit_shape(Y, np.column_stack([knot_x(kk), apr]))
+        s_f, k_f, _ = fit_shape(Y, np.eye(11)[:, 1:])
+        F = ((s_r - s_f) / (k_f - k_r)) / (s_f / (n_ - k_f))
+        row["lack_of_fit_F"], row["lack_of_fit_p"] = F, stats.f.sf(F, k_f - k_r, n_ - k_f)
+        shape_rows.append(row)
+shape = pd.DataFrame(shape_rows)
+shape.to_csv(OUT_TAB / "monthly_shape_comparison.csv", index=False)
 
 # ---------------------------------------------------------------------------
-# 4. Model comparison: school-year trend vs photoperiod vs sinusoid
+# 4. Location vs spread: does a shift of the mean reproduce each category's change?
 # ---------------------------------------------------------------------------
-def add_terms(d):
-    d = d.copy()
-    d["cosw"] = np.cos(2 * np.pi * d["t_years"])
-    d["sinw"] = np.sin(2 * np.pi * d["t_years"])
-    d["after_dec"] = np.clip(d["acad_month"] - 4, 0, None)  # hinge: separate slope from January
-    return d
-
-comp_rows = []
-for c in COHORTS:
-    s = add_terms(df[df.cohort == c])
-    for cat in ["obese", "owob", "underweight", "z_mean"]:
-        y = f"pct_{cat}" if cat != "z_mean" else cat
-        specs = {
-            "year FE only": f"{y} ~ C(ncmp_year)",
-            "school-year trend": f"{y} ~ C(ncmp_year) + acad_month",
-            "photoperiod": f"{y} ~ C(ncmp_year) + photoperiod_h",
-            "sinusoid": f"{y} ~ C(ncmp_year) + cosw + sinw",
-            "trend + photoperiod": f"{y} ~ C(ncmp_year) + acad_month + photoperiod_h",
-            "trend + sinusoid": f"{y} ~ C(ncmp_year) + acad_month + cosw + sinw",
-            "quadratic trend": f"{y} ~ C(ncmp_year) + acad_month + I(acad_month ** 2)",
-            "quadratic trend + photoperiod": f"{y} ~ C(ncmp_year) + acad_month + I(acad_month ** 2) + photoperiod_h",
-            "two-phase trend": f"{y} ~ C(ncmp_year) + acad_month + after_dec",
-            "two-phase trend + photoperiod": f"{y} ~ C(ncmp_year) + acad_month + after_dec + photoperiod_h",
-            "month FE (saturated)": f"{y} ~ C(ncmp_year) + C(acad_month)",
-        }
-        fits = {k: smf.ols(v, data=s).fit() for k, v in specs.items()}
-        clustered = cluster_fit(specs["trend + photoperiod"], s)
-        F_photo = fits["trend + photoperiod"].compare_f_test(fits["school-year trend"])
-        F_sin = fits["trend + sinusoid"].compare_f_test(fits["school-year trend"])
-        F_trend_given_photo = fits["trend + photoperiod"].compare_f_test(fits["photoperiod"])
-        F_photo_given_quad = fits["quadratic trend + photoperiod"].compare_f_test(fits["quadratic trend"])
-        clustered_quad = cluster_fit(specs["quadratic trend + photoperiod"], s)
-        F_photo_given_2ph = fits["two-phase trend + photoperiod"].compare_f_test(fits["two-phase trend"])
-        clustered_2ph = cluster_fit(specs["two-phase trend + photoperiod"], s)
-        # collapsed to the 11 month means (most conservative)
-        mm = s.groupby("acad_month").agg(y=(y, "mean"), photo=("photoperiod_h", "first")).reset_index()
-        col = smf.ols("y ~ acad_month + photo", data=mm).fit()
-        col_photo_only = smf.ols("y ~ photo", data=mm).fit()
-        comp_rows.append({
-            "cohort": c, "outcome": cat,
-            **{f"aic_{k}": f.aic for k, f in fits.items()},
-            **{f"adjR2_{k}": f.rsquared_adj for k, f in fits.items()},
-            "photo_coef_alone": fits["photoperiod"].params["photoperiod_h"],
-            "photo_coef_given_trend": fits["trend + photoperiod"].params["photoperiod_h"],
-            "photo_coef_given_trend_clustered_p": clustered.pvalues["photoperiod_h"],
-            "F_photo_given_trend_p": F_photo[1], "F_sinusoid_given_trend_p": F_sin[1],
-            "F_trend_given_photo_p": F_trend_given_photo[1],
-            "F_photo_given_quadratic_trend_p": F_photo_given_quad[1],
-            "photo_coef_given_quadratic_trend": fits["quadratic trend + photoperiod"].params["photoperiod_h"],
-            "photo_coef_given_quadratic_trend_clustered_p": clustered_quad.pvalues["photoperiod_h"],
-            "F_photo_given_two_phase_trend_p": F_photo_given_2ph[1],
-            "photo_coef_given_two_phase_trend": fits["two-phase trend + photoperiod"].params["photoperiod_h"],
-            "photo_coef_given_two_phase_trend_clustered_p": clustered_2ph.pvalues["photoperiod_h"],
-            "trend_coef_given_photo": fits["trend + photoperiod"].params["acad_month"],
-            "trend_coef_given_photo_clustered_p": clustered.pvalues["acad_month"],
-            "collapsed_photo_coef": col.params["photo"], "collapsed_photo_p": col.pvalues["photo"],
-            "collapsed_trend_coef": col.params["acad_month"], "collapsed_trend_p": col.pvalues["acad_month"],
-            "collapsed_photo_only_r": float(np.sign(col_photo_only.params["photo"]) * np.sqrt(col_photo_only.rsquared)),
-            "collapsed_photo_only_p": col_photo_only.pvalues["photo"],
-        })
-comp = pd.DataFrame(comp_rows)
-comp.to_csv(OUT_TAB / "monthly_model_comparison.csv", index=False)
-
-# Residual seasonal structure after the school-year trend (Reception obesity), by month
-resid_rows = []
-for c in COHORTS:
-    s = df[df.cohort == c].copy()
-    f = smf.ols("pct_obese ~ C(ncmp_year) + acad_month", data=s).fit()
-    s["resid"] = f.resid
-    r = s.groupby("acad_month").agg(resid=("resid", "mean"), photo=("photoperiod_h", "first")).reset_index()
-    r["cohort"] = c
-    resid_rows.append(r)
-resid = pd.concat(resid_rows)
-resid.to_csv(OUT_TAB / "monthly_obesity_residuals_after_trend.csv", index=False)
-resid_corr = {c: float(np.corrcoef(resid[resid.cohort == c].resid, resid[resid.cohort == c].photo)[0, 1]) for c in COHORTS}
-
-# Collinearity: over September-July, how much of day length is a smooth function of school month?
-mm_photo = df.groupby("acad_month")["photoperiod_h"].first()
-am = mm_photo.index.values.astype(float)
-X_lin = np.column_stack([np.ones(11), am])
-X_quad = np.column_stack([np.ones(11), am, am ** 2])
-r2_lin = 1 - np.sum((mm_photo.values - X_lin @ np.linalg.lstsq(X_lin, mm_photo.values, rcond=None)[0]) ** 2) / np.sum((mm_photo.values - mm_photo.mean()) ** 2)
-r2_quad = 1 - np.sum((mm_photo.values - X_quad @ np.linalg.lstsq(X_quad, mm_photo.values, rcond=None)[0]) ** 2) / np.sum((mm_photo.values - mm_photo.mean()) ** 2)
-results["photoperiod_vs_school_month_r2"] = {"linear": float(r2_lin), "quadratic": float(r2_quad)}
-
-# ---------------------------------------------------------------------------
-# 4b. The September reset: July of one school year -> September of the next.
-#     Day length falls by ~3.6 h between mid-July and mid-September, so a photoperiod-driven
-#     process predicts little change (photoperiod alone) or a fall (positive coefficient given
-#     the trend); a school-year-anchored process predicts a rise of ~10 x the monthly slope.
-# ---------------------------------------------------------------------------
-reset_rows = []
-years = sorted(df_all.ncmp_year.unique())
-for c in COHORTS:
-    s_all = df_all[df_all.cohort == c]
-    comp_c = comp[comp.cohort == c].set_index("outcome")
-    tr_c = trends[trends.cohort == c].set_index("outcome")
-    for cat in ["obese", "owob", "underweight"]:
-        y = f"pct_{cat}"
-        changes = []
-        for y0, y1 in zip(years[:-1], years[1:]):
-            jul = s_all[(s_all.ncmp_year == y0) & (s_all.acad_month == 11)]
-            sep = s_all[(s_all.ncmp_year == y1) & (s_all.acad_month == 1)]
-            if len(jul) and len(sep):
-                changes.append(float(sep[y].iloc[0] - jul[y].iloc[0]))
-        changes = np.array(changes)
-        d_photo = float(mm_photo.loc[1] - mm_photo.loc[11])
-        t_ci = stats.t.ppf(0.975, len(changes) - 1) * changes.std(ddof=1) / np.sqrt(len(changes))
-        reset_rows.append({
-            "cohort": c, "outcome": cat, "n_transitions": len(changes),
-            "observed_mean_change": changes.mean(), "ci_low": changes.mean() - t_ci, "ci_high": changes.mean() + t_ci,
-            "n_positive": int((changes > 0).sum()), "sign_test_p": float(stats.binomtest(int((changes > 0).sum()), len(changes)).pvalue),
-            "day_length_change_h": d_photo,
-            "pred_school_year_trend": -10 * tr_c.loc[cat, "slope_per_month"],
-            "pred_photoperiod_alone": comp_c.loc[cat, "photo_coef_alone"] * d_photo,
-            "pred_photoperiod_coef_given_trend": comp_c.loc[cat, "photo_coef_given_trend"] * d_photo,
-        })
-reset = pd.DataFrame(reset_rows)
-reset.to_csv(OUT_TAB / "monthly_september_reset.csv", index=False)
-
-# ---------------------------------------------------------------------------
-# 5. Distribution location vs scale: does a pure shift of the mean explain each tail?
-#    Predicted change in each category over the year if only the mean z shifted.
-# ---------------------------------------------------------------------------
-#    Changes are the fitted September->July change (10 x within-year slope, year fixed effects),
-#    which is less noisy than comparing the two smallest months directly.
 shift_rows = []
+
+
+def prevalence(mu, sd):
+    return {"underweight": 100 * stats.norm.cdf((CUTPOINTS["underweight"] - mu) / sd),
+            "owob": 100 * stats.norm.sf((CUTPOINTS["overweight"] - mu) / sd),
+            "obese": 100 * stats.norm.sf((CUTPOINTS["obese"] - mu) / sd),
+            "severe": 100 * stats.norm.sf((CUTPOINTS["severe"] - mu) / sd)}
+
+
 for c in COHORTS:
     s = df[df.cohort == c]
-    tr = trends[trends.cohort == c].set_index("outcome")
+    pr = periods[periods.cohort == c].set_index("outcome")
     mu_bar, sd_bar = s["z_mean"].mean(), s["z_sd"].mean()
-    d_mu, d_sd = 10 * tr.loc["z_mean", "slope_per_month"], 10 * tr.loc["z_sd", "slope_per_month"]
-    def prev(mu, sd):
-        return {"underweight": 100 * stats.norm.cdf((CUTPOINTS["underweight"] - mu) / sd),
-                "owob": 100 * stats.norm.sf((CUTPOINTS["overweight"] - mu) / sd),
-                "obese": 100 * stats.norm.sf((CUTPOINTS["obese"] - mu) / sd),
-                "severe": 100 * stats.norm.sf((CUTPOINTS["severe"] - mu) / sd)}
-    p_sep_loc, p_jul_loc = prev(mu_bar - d_mu / 2, sd_bar), prev(mu_bar + d_mu / 2, sd_bar)
-    p_sep_both, p_jul_both = prev(mu_bar - d_mu / 2, sd_bar - d_sd / 2), prev(mu_bar + d_mu / 2, sd_bar + d_sd / 2)
-    for k in p_sep_loc:
-        shift_rows.append({"cohort": c, "outcome": k, "observed_sep_to_jul": 10 * tr.loc[k, "slope_per_month"],
-                           "predicted_mean_shift_only": p_jul_loc[k] - p_sep_loc[k],
-                           "predicted_mean_and_sd": p_jul_both[k] - p_sep_both[k]})
+    for name, months in (("sep_dec", 3), ("may_jul", 2)):          # change from first to last month of the period
+        d_mu, d_sd = months * pr.loc["z_mean", f"slope_{name}"], months * pr.loc["z_sd", f"slope_{name}"]
+        a_loc, b_loc = prevalence(mu_bar - d_mu / 2, sd_bar), prevalence(mu_bar + d_mu / 2, sd_bar)
+        a_both, b_both = prevalence(mu_bar - d_mu / 2, sd_bar - d_sd / 2), prevalence(mu_bar + d_mu / 2, sd_bar + d_sd / 2)
+        for k in a_loc:
+            shift_rows.append({"cohort": c, "period": name, "outcome": k,
+                               "observed_change": months * pr.loc[k, f"slope_{name}"],
+                               "predicted_mean_shift_only": b_loc[k] - a_loc[k],
+                               "predicted_mean_and_sd": b_both[k] - a_both[k],
+                               "z_mean_change": d_mu, "z_sd_change": d_sd})
     results.setdefault("distribution", {})[c] = {
-        "z_mean_overall": mu_bar, "z_sd_overall": sd_bar, "z_mean_change_sep_to_jul": d_mu,
-        "z_mean_change_ci": [10 * tr.loc["z_mean", "slope_ci_low"], 10 * tr.loc["z_mean", "slope_ci_high"]],
-        "z_sd_change_sep_to_jul": d_sd, "z_sd_change_p": tr.loc["z_sd", "slope_p"],
+        "z_mean_overall": mu_bar, "z_sd_overall": sd_bar,
         "probit_fit_rmse_median": float(s["probit_fit_rmse"].median())}
 shift = pd.DataFrame(shift_rows)
 shift.to_csv(OUT_TAB / "monthly_distribution_shift.csv", index=False)
 
 # ---------------------------------------------------------------------------
-# 6. Sensitivity: include 2019/20 (Sept-Feb); Year 6 excluding 2007/08-2008/09
+# 5. Pattern shared by the two cohorts, and cohort-specific change
+# ---------------------------------------------------------------------------
+df["cy"] = df.cohort + "_" + df.ncmp_year
+df["rec"] = (df.cohort == "Reception").astype(float)
+
+
+def designs(data):
+    """Explicit design matrices (avoids ambiguity about rank in nested F tests)."""
+    fe = pd.get_dummies(data.cy, dtype=float).values
+    m = data.acad_month.values
+    rec = data.rec.values
+    y6 = 1 - rec
+    Dm = np.column_stack([(m == k).astype(float) for k in range(2, 12)])
+    X0 = np.column_stack([fe, rec * m, y6 * m])                       # cohort-specific linear trends
+    X1 = np.column_stack([X0, Dm])                                    # + month effects shared by cohorts
+    X2 = np.column_stack([fe, rec[:, None] * Dm, y6[:, None] * Dm])   # cohort-specific month effects
+    return X0, X1, X2
+
+
+def nested_f(Xr, Xf, y):
+    def ssr(X):
+        b, *_ = np.linalg.lstsq(X, y, rcond=None)
+        e = y - X @ b
+        return e @ e, np.linalg.matrix_rank(X)
+    (s0, r0), (s1, r1) = ssr(Xr), ssr(Xf)
+    df1, df2 = r1 - r0, len(y) - r1
+    F = ((s0 - s1) / df1) / (s1 / df2)
+    return float(F), int(df1), int(df2), float(stats.f.sf(F, df1, df2))
+
+
+def detrend(v):
+    return v - np.polyval(np.polyfit(MONTHS, v, 1), MONTHS)
+
+
+def detrended_profiles(data, y):
+    """Per cohort: deviation from each school year's mean, averaged over years, minus its own
+    linear fit across school months."""
+    return pd.DataFrame({c: pd.Series(detrend(year_by_month(data, c, y).pipe(
+        lambda p: p.sub(p.mean(axis=1), axis=0)).mean().values), index=MONTHS) for c in COHORTS})
+
+
+decomp_rows, shared_rows = [], []
+P = np.polyfit(MONTHS, np.eye(11), 1)                                 # linear-fit operator
+DETR = np.eye(11) - np.vander(MONTHS, 2) @ P                          # residual-maker for a linear fit
+for y, label in SHAPE_OUTCOMES.items():
+    X0, X1, X2 = designs(df)
+    yy = df[y].values
+    F_shared = nested_f(X0, X1, yy)
+    F_cohort = nested_f(X1, X2, yy)
+    fr = cluster_fit(f"{y} ~ C(cy) + C(acad_month) + rec:acad_month", df)
+    prof = detrended_profiles(df, y)
+    shared = prof.mean(axis=1)
+    r_c, p_c = stats.pearsonr(prof["Reception"], prof["Year 6"])
+    r_d, p_d = stats.pearsonr(shared, detrend(D_month))
+    dev = {c: year_by_month(df, c, y).pipe(lambda p: p.sub(p.mean(axis=1), axis=0)).values for c in COHORTS}
+    boots = np.array([np.mean([DETR @ dev[c][pick].mean(axis=0) for c in COHORTS], axis=0)
+                      for pick in (rng.integers(0, len(years), len(years)) for _ in range(2000))])
+    decomp_rows.append({
+        "outcome": y, "label": label,
+        "F_shared": F_shared[0], "df_shared": f"{F_shared[1]},{F_shared[2]}", "p_shared": F_shared[3],
+        "F_cohort_diff": F_cohort[0], "df_cohort_diff": f"{F_cohort[1]},{F_cohort[2]}", "p_cohort_diff": F_cohort[3],
+        "r_cohort_profiles": r_c, "p_cohort_profiles": p_c,
+        "reception_extra_slope": fr.params["rec:acad_month"],
+        "reception_extra_slope_ci_low": fr.conf_int().loc["rec:acad_month", 0],
+        "reception_extra_slope_ci_high": fr.conf_int().loc["rec:acad_month", 1],
+        "reception_extra_slope_p": fr.pvalues["rec:acad_month"],
+        "shared_range": float(shared.max() - shared.min()),
+        "shared_lowest": ACAD_MONTHS[int(shared.idxmin()) - 1], "shared_highest": ACAD_MONTHS[int(shared.idxmax()) - 1],
+        "r_shared_vs_day_length": r_d, "p_shared_vs_day_length": p_d,
+    })
+    lo, hi = np.percentile(boots, [2.5, 97.5], axis=0)
+    for i, mth in enumerate(MONTHS):
+        shared_rows.append({"outcome": y, "acad_month": mth, "month": ACAD_MONTHS[mth - 1],
+                            "reception": prof.loc[mth, "Reception"], "year6": prof.loc[mth, "Year 6"],
+                            "shared": shared.loc[mth], "shared_ci_low": lo[i], "shared_ci_high": hi[i],
+                            "day_length_h": D_month[i], "day_length_detrended": detrend(D_month)[i]})
+decomp = pd.DataFrame(decomp_rows)
+decomp.to_csv(OUT_TAB / "monthly_decomposition.csv", index=False)
+shared_tab = pd.DataFrame(shared_rows)
+shared_tab.to_csv(OUT_TAB / "monthly_shared_component.csv", index=False)
+
+# ---------------------------------------------------------------------------
+# 6. The spring peak and the date of Easter
+# ---------------------------------------------------------------------------
+def bst_start(year):
+    d = dt.date(year, 3, 31)
+    return d - dt.timedelta(days=(d.weekday() + 1) % 7)            # last Sunday in March
+
+
+EASTER_OUTCOMES = ["pct_obese", "pct_owob", "z_mean", "pct_underweight"]
+erows = []
+for yr in years:
+    cal = int(yr[:4]) + 1
+    e = easter(cal)
+    row = {"ncmp_year": yr, "easter": e.isoformat(), "easter_doy": e.timetuple().tm_yday,
+           "bst_start": bst_start(cal).isoformat(), "bst_start_doy": bst_start(cal).timetuple().tm_yday}
+    for c in COHORTS:
+        s = df[(df.cohort == c) & (df.ncmp_year == yr)].set_index("acad_month")
+        for y in EASTER_OUTCOMES:
+            d_ = s[y] - s[y].mean()
+            for mth, nm in ((MARCH, "mar"), (APRIL, "apr"), (MAY, "may"), (10, "jun")):
+                row[f"{c}|{y}|{nm}"] = d_.loc[mth]
+            row[f"{c}|{y}|apr_minus_may"] = d_.loc[APRIL] - d_.loc[MAY]
+        n = s["n_measured"] / s["n_measured"].sum() * 100
+        row[f"{c}|april_share_pct"], row[f"{c}|march_share_pct"] = n.loc[APRIL], n.loc[MARCH]
+    for y in EASTER_OUTCOMES:
+        row[f"both|{y}|apr_minus_may"] = (row[f"Reception|{y}|apr_minus_may"] + row[f"Year 6|{y}|apr_minus_may"]) / 2
+    erows.append(row)
+east = pd.DataFrame(erows)
+east.to_csv(OUT_TAB / "monthly_april_easter.csv", index=False)
+
+median_doy = east.easter_doy.median()
+early = east.easter_doy < median_doy
+perm = np.array([rng.permutation(len(east)) for _ in range(20000)])
+easter_tests = []
+for c in COHORTS + ["both"]:
+    for y in EASTER_OUTCOMES:
+        v = east[f"{c}|{y}|apr_minus_may"].values
+        x_ = east.easter_doy.values
+        r, p = stats.pearsonr(x_, v)
+        r_perm = np.array([np.corrcoef(x_, v[pp])[0, 1] for pp in perm])
+        loo = [stats.pearsonr(np.delete(x_, i), np.delete(v, i))[0] for i in range(len(v))]
+        tt = stats.ttest_ind(v[early], v[~early])
+        r_bst = stats.pearsonr(east.bst_start_doy, v)[0]
+        rec = {"cohort": c, "outcome": y, "r_easter": r, "p_easter": p,
+               "p_easter_permutation": float((np.abs(r_perm) >= abs(r) - 1e-12).mean()),
+               "r_leave_one_out_min": min(loo), "r_leave_one_out_max": max(loo),
+               "early_mean": v[early].mean(), "late_mean": v[~early].mean(),
+               "early_minus_late": v[early].mean() - v[~early].mean(), "p_early_vs_late": tt.pvalue,
+               "r_bst_start": r_bst}
+        if c != "both":
+            for nm in ("mar", "apr", "may", "jun"):
+                rec[f"r_easter_{nm}"] = stats.pearsonr(x_, east[f"{c}|{y}|{nm}"])[0]
+                rec[f"p_easter_{nm}"] = stats.pearsonr(x_, east[f"{c}|{y}|{nm}"])[1]
+        easter_tests.append(rec)
+easter_tests = pd.DataFrame(easter_tests)
+easter_tests.to_csv(OUT_TAB / "monthly_easter_tests.csv", index=False)
+
+# Spring profiles (deviation from each year's January-July mean) in early- and late-Easter years
+sp_rows = []
+for c in COHORTS + ["both"]:
+    for y in EASTER_OUTCOMES + ["pct_severe"]:
+        piv = (year_by_month(df, "Reception", y) + year_by_month(df, "Year 6", y)) / 2 if c == "both" \
+            else year_by_month(df, c, y)
+        dev = piv.loc[:, 5:11].sub(piv.loc[:, 5:11].mean(axis=1), axis=0)
+        for grp, mask in (("early", early.values), ("late", ~early.values)):
+            g = dev[mask]
+            for mth in range(5, 12):
+                v = g[mth]
+                sp_rows.append({"cohort": c, "outcome": y, "easter": grp, "acad_month": mth,
+                                "month": ACAD_MONTHS[mth - 1], "deviation": v.mean(),
+                                "ci95": stats.t.ppf(0.975, len(v) - 1) * v.std(ddof=1) / np.sqrt(len(v))})
+spring = pd.DataFrame(sp_rows)
+spring.to_csv(OUT_TAB / "monthly_spring_by_easter.csv", index=False)
+results["easter"] = {
+    "median_easter_doy": float(median_doy), "n_early": int(early.sum()), "n_late": int((~early).sum()),
+    "early_dates": east.loc[early, "easter"].tolist(), "late_dates": east.loc[~early, "easter"].tolist(),
+    "bst_start_range": [east.bst_start.min(), east.bst_start.max()],
+    "r_april_share_easter": {c: float(stats.pearsonr(east.easter_doy, east[f"{c}|april_share_pct"])[0]) for c in COHORTS},
+    "r_march_share_easter": {c: float(stats.pearsonr(east.easter_doy, east[f"{c}|march_share_pct"])[0]) for c in COHORTS},
+    "tests": easter_tests.to_dict(orient="records"),
+}
+
+# ---------------------------------------------------------------------------
+# 7. Sensitivity analyses
 # ---------------------------------------------------------------------------
 sens = []
-extra = df_all[(df_all.ncmp_year == "2019/20") & (df_all.acad_month <= 6)]
-for label, data in {"primary (2007/08-2018/19)": df,
-                    "plus 2019/20 Sep-Feb": pd.concat([df, extra]),
-                    "excluding 2007/08-2008/09": df[~df.ncmp_year.isin(["2007/08", "2008/09"])],
-                    "before universal infant free school meals (2007/08-2013/14)": df[df.ncmp_year < "2014/15"],
-                    "after universal infant free school meals (2014/15-2018/19)": df[df.ncmp_year >= "2014/15"]}.items():
+extra = df_all[(df_all.ncmp_year == "2019/20") & (df_all.acad_month <= 6)].copy()
+extra["cy"] = extra.cohort + "_" + extra.ncmp_year
+extra["rec"] = (extra.cohort == "Reception").astype(float)
+samples = {"all 12 years (2007/08-2018/19)": df,
+           "plus 2019/20 (September-February)": pd.concat([df, extra], ignore_index=True),
+           "excluding September and July (fewest children measured)": df[df.acad_month.between(2, 10)],
+           "excluding 2007/08 and 2008/09": df[~df.ncmp_year.isin(["2007/08", "2008/09"])],
+           "2007/08-2013/14 (before universal infant free school meals)": df[df.ncmp_year < "2014/15"],
+           "2014/15-2018/19 (after universal infant free school meals)": df[df.ncmp_year >= "2014/15"]}
+for label, data in samples.items():
+    data = data.reset_index(drop=True)
+    row = {"sample": label, "months_per_cohort": int(len(data) / 2)}
+    if data.acad_month.nunique() == 11:
+        X0, X1, _ = designs(data)
+        Fs = nested_f(X0, X1, data["z_mean"].values)
+        row.update({"F_shared_z": Fs[0], "p_shared_z": Fs[3]})
     for c in COHORTS:
         s = data[data.cohort == c]
-        f = cluster_fit("pct_obese ~ C(ncmp_year) + acad_month", s)
-        g = cluster_fit("pct_obese ~ C(ncmp_year) + acad_month + photoperiod_h", s)
-        sens.append({"sample": label, "cohort": c, "n_months": len(s), "obese_slope": f.params["acad_month"],
-                     "obese_slope_p": f.pvalues["acad_month"], "photo_given_trend": g.params["photoperiod_h"],
-                     "photo_given_trend_p": g.pvalues["photoperiod_h"]})
+        for y in ["pct_obese", "z_mean"]:
+            for name in ("sep_dec", "jan_jul"):
+                m0, m1 = PERIODS[name]
+                sub = s[(s.acad_month >= m0) & (s.acad_month <= m1)]
+                if sub.acad_month.nunique() >= 2:
+                    f = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month", sub)
+                    row[f"{c}|{y}|{name}"], row[f"{c}|{y}|{name}|p"] = f.params["acad_month"], f.pvalues["acad_month"]
+    sens.append(row)
 sens = pd.DataFrame(sens)
 sens.to_csv(OUT_TAB / "monthly_sensitivity.csv", index=False)
 
-# Did the within-year slope change when universal infant free school meals began (September 2014)?
-uifsm = []
-for c in COHORTS:
-    s_ = df[df.cohort == c].assign(post=lambda d: (d.ncmp_year >= "2014/15").astype(int))
-    for y in ["pct_obese", "pct_owob", "pct_underweight", "z_mean"]:
-        f = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month + acad_month:post", s_)
-        uifsm.append({"cohort": c, "outcome": y, "slope_before": f.params["acad_month"],
-                      "slope_change_after": f.params["acad_month:post"], "p_change": f.pvalues["acad_month:post"]})
-uifsm = pd.DataFrame(uifsm)
-uifsm.to_csv(OUT_TAB / "monthly_slope_before_after_uifsm.csv", index=False)
-
-
 results.update({
-    "trends": trends.set_index(["cohort", "outcome"]).to_dict(orient="index"),
-    "cosinor": cos_tab.set_index(["cohort", "outcome"]).to_dict(orient="index"),
-    "model_comparison": comp.set_index(["cohort", "outcome"]).to_dict(orient="index"),
-    "residual_vs_photoperiod_corr": resid_corr,
+    "within_year": periods.set_index(["cohort", "outcome"]).to_dict(orient="index"),
+    "shape": shape.set_index(["cohort", "outcome"]).to_dict(orient="index"),
     "distribution_shift": shift.to_dict(orient="records"),
+    "decomposition": decomp.set_index("outcome").to_dict(orient="index"),
+    "shared_component": shared_tab.to_dict(orient="records"),
     "sensitivity": sens.to_dict(orient="records"),
-    "september_reset": reset.to_dict(orient="records"),
-    "slope_before_after_uifsm": uifsm.to_dict(orient="records"),
 })
-# JSON keys must be strings
 results = {k: ({"|".join(kk) if isinstance(kk, tuple) else kk: vv for kk, vv in v.items()} if isinstance(v, dict) else v)
            for k, v in results.items()}
 save_results("temporal", results)
 
 pd.set_option("display.width", 250)
-print("TIMING"); print({c: (results['timing'][c]['terms_pct'], results['timing'][c]['modal_month']) for c in COHORTS})
-print("\nTRENDS"); print(trends.round(4).to_string(index=False))
-print("\nCOSINOR"); print(cos_tab.round(4).to_string(index=False))
-print("\nMODEL COMPARISON"); print(comp[["cohort", "outcome", "photo_coef_alone", "photo_coef_given_trend", "photo_coef_given_trend_clustered_p",
-                                       "F_photo_given_trend_p", "F_sinusoid_given_trend_p", "trend_coef_given_photo", "trend_coef_given_photo_clustered_p",
-                                       "collapsed_photo_coef", "collapsed_photo_p", "collapsed_trend_coef", "collapsed_trend_p",
-                                       "aic_school-year trend", "aic_photoperiod", "aic_sinusoid", "aic_trend + photoperiod"]].round(4).to_string(index=False))
-print("\nRESIDUALS (Reception obesity after school-year trend)"); print(resid[resid.cohort == "Reception"].round(3).to_string(index=False))
-print("residual~photoperiod r:", resid_corr)
-print("\nDISTRIBUTION SHIFT"); print(shift.round(3).to_string(index=False)); print(results["distribution"])
-print("\nSENSITIVITY"); print(sens.round(4).to_string(index=False))
-print("\nSEPTEMBER RESET"); print(reset.round(3).to_string(index=False))
-print("\nSLOPE BEFORE/AFTER UIFSM"); print(uifsm.round(4).to_string(index=False))
-print("photoperiod vs school month R2:", results["photoperiod_vs_school_month_r2"])
-print(comp[["cohort", "outcome", "aic_school-year trend", "aic_quadratic trend", "aic_two-phase trend", "aic_trend + photoperiod",
-            "aic_two-phase trend + photoperiod", "aic_month FE (saturated)", "photo_coef_given_trend", "photo_coef_given_trend_clustered_p",
-            "photo_coef_given_quadratic_trend", "photo_coef_given_quadratic_trend_clustered_p",
-            "photo_coef_given_two_phase_trend", "photo_coef_given_two_phase_trend_clustered_p"]].round(4).to_string(index=False))
+pd.set_option("display.max_columns", 60)
+print("TIMING", {c: (results["timing"][c]["terms_pct"], results["timing"][c]["modal_month"]) for c in COHORTS})
+cols = ["cohort", "outcome", "slope_sep_dec", "p_sep_dec", "slope_jan_mar", "p_jan_mar", "slope_may_jul", "p_may_jul",
+        "slope_jan_jul", "p_jan_jul", "p_autumn_vs_jan_jul", "april_peak", "april_peak_p", "april_peak_n_positive",
+        "january_peak", "january_peak_p"]
+print("\nWITHIN-YEAR CHANGE BY PERIOD"); print(periods[cols].round(4).to_string(index=False))
+aic_cols = [c for c in shape.columns if c.startswith("aic_")]
+d_aic = shape[aic_cols].sub(shape[aic_cols].min(axis=1), axis=0).round(1)
+d_aic.columns = [c[4:] for c in aic_cols]
+print("\nSHAPE: delta AIC"); print(pd.concat([shape[["cohort", "outcome"]], d_aic], axis=1).to_string(index=False))
+print(shape[["cohort", "outcome", "end_of_decline", "end_of_decline_boot_mode", "end_of_decline_boot_dec_or_jan",
+             "end_of_decline_boot_range", "lack_of_fit_F", "lack_of_fit_p"]].round(3).to_string(index=False))
+print("\nDISTRIBUTION SHIFT"); print(shift.round(3).to_string(index=False))
+print("\nDECOMPOSITION"); print(decomp.round(4).T.to_string())
+print("\nEASTER"); print(easter_tests.round(3).to_string(index=False))
+print({k: v for k, v in results["easter"].items() if k != "tests"})
+print("\nSENSITIVITY"); print(sens.round(4).T.to_string())

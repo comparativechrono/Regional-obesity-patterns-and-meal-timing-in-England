@@ -1,11 +1,7 @@
-Sample,Cohort,Months,"Obesity slope, pp per month (p)","Day-length coefficient given linear trend, pp per hour (p)"
-primary (2007/08-2018/19),Reception,132,-0.147 (<0.001),+0.120 (<0.001)
-primary (2007/08-2018/19),Year 6,132,-0.031 (0.12),+0.044 (0.032)
-plus 2019/20 Sep-Feb,Reception,138,-0.151 (<0.001),+0.127 (<0.001)
-plus 2019/20 Sep-Feb,Year 6,138,-0.031 (0.11),+0.045 (0.018)
-excluding 2007/08-2008/09,Reception,110,-0.147 (<0.001),+0.129 (<0.001)
-excluding 2007/08-2008/09,Year 6,110,-0.026 (0.26),+0.041 (0.092)
-before universal infant free school meals (2007/08-2013/14),Reception,77,-0.132 (<0.001),+0.075 (0.022)
-before universal infant free school meals (2007/08-2013/14),Year 6,77,-0.026 (0.20),+0.029 (0.16)
-after universal infant free school meals (2014/15-2018/19),Reception,55,-0.167 (<0.001),+0.182 (<0.001)
-after universal infant free school meals (2014/15-2018/19),Year 6,55,-0.038 (0.36),+0.065 (0.11)
+Sample,Months per cohort,Reception obesity: Sep-Dec (p),Reception obesity: Jan-Jul (p),Year 6 obesity: Sep-Dec (p),Year 6 obesity: Jan-Jul (p),Reception mean z: Sep-Dec (p),Year 6 mean z: Sep-Dec (p),"Shared month pattern, mean z: F (p)"
+all 12 years (2007/08-2018/19),132,-0.393 (<0.001),-0.027 (0.37),-0.160 (0.013),-0.011 (0.81),-0.0211 (<0.001),-0.0132 (<0.001),11.8 (<0.001)
+plus 2019/20 (September-February),138,-0.419 (<0.001),-0.028 (0.36),-0.170 (0.005),-0.011 (0.81),-0.0219 (<0.001),-0.0140 (<0.001),12.8 (<0.001)
+excluding September and July (fewest children measured),108,-0.467 (<0.001),-0.004 (0.85),-0.088 (0.30),+0.008 (0.83),-0.0301 (<0.001),-0.0163 (<0.001),
+excluding 2007/08 and 2008/09,110,-0.405 (<0.001),-0.007 (0.83),-0.143 (0.056),-0.002 (0.98),-0.0260 (<0.001),-0.0135 (<0.001),12.8 (<0.001)
+2007/08-2013/14 (before universal infant free school meals),77,-0.269 (0.020),-0.066 (0.009),-0.069 (0.33),+0.015 (0.82),-0.0115 (0.027),-0.0090 (<0.001),7.0 (<0.001)
+2014/15-2018/19 (after universal infant free school meals),55,-0.565 (<0.001),+0.027 (0.63),-0.287 (<0.001),-0.046 (0.40),-0.0345 (<0.001),-0.0191 (<0.001),13.5 (<0.001)

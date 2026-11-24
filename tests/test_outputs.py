@@ -62,8 +62,31 @@ def test_monthly_series():
 def test_tables_agree_with_results_registry():
     r = json.loads(RESULTS_JSON.read_text())
     gm = pd.read_csv(OUT_TAB / "geo_models.csv")
+    assert len(gm) == 2 * len(INDICATORS)
     for _, row in gm.iterrows():
-        stored = r["geographic"]["models"][f"{row.year}|{row.model}|{row.indicator}"]
+        stored = r["geographic"]["models"][f"{row.model}|{row.indicator}"]
         assert stored["lat_beta"] == pytest.approx(row.lat_beta)
-    reset = pd.read_csv(OUT_TAB / "monthly_september_reset.csv")
-    assert (reset.n_transitions == 12).all()
+        assert row.n_las >= 149 and row.n_obs <= 3 * 151
+    wy = pd.read_csv(OUT_TAB / "monthly_within_year_change.csv")
+    for _, row in wy.iterrows():
+        stored = r["temporal"]["within_year"][f"{row.cohort}|{row.outcome}"]
+        assert stored["slope_sep_dec"] == pytest.approx(row.slope_sep_dec)
+
+
+@built
+def test_pooled_estimates_lie_among_single_year_estimates():
+    """The pooled latitude coefficient is a weighted average of the three years' information, so it
+    should fall within (or very near) the range of the single-year estimates."""
+    gm = pd.read_csv(OUT_TAB / "geo_models.csv")
+    gy = pd.read_csv(OUT_TAB / "geo_models_by_year.csv")
+    for _, row in gm.iterrows():
+        yr = gy[(gy.indicator == row.indicator) & (gy.model == row.model)].lat_beta
+        assert yr.min() - 0.05 <= row.lat_beta <= yr.max() + 0.05
+
+
+@built
+def test_easter_table_covers_complete_school_years():
+    e = pd.read_csv(OUT_TAB / "monthly_april_easter.csv")
+    assert len(e) == 12 and e.ncmp_year.is_unique
+    assert e.easter_doy.between(81, 116).all()                 # Easter falls 22 March to 25 April
+    assert pd.to_datetime(e.bst_start).dt.dayofweek.eq(6).all()  # British Summer Time starts on a Sunday

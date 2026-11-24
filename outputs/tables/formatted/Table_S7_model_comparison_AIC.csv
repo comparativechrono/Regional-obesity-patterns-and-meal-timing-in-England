@@ -1,9 +1,0 @@
-Cohort,Outcome,dAIC: year FE only,dAIC: photoperiod,dAIC: sinusoid,dAIC: school-year trend,dAIC: quadratic trend,dAIC: two-phase trend,dAIC: trend + photoperiod,dAIC: trend + sinusoid,dAIC: quadratic trend + photoperiod,dAIC: two-phase trend + photoperiod,dAIC: month FE (saturated)
-Reception,Obesity,135.0,129.8,71.6,47.7,17.0,4.3,1.1,1.6,2.7,2.9,0.0
-Reception,Overweight incl. obesity,179.6,149.3,121.1,34.7,36.3,29.6,23.1,16.0,9.0,16.0,0.0
-Reception,Underweight,80.9,59.6,61.1,38.3,24.4,38.0,40.2,13.6,0.0,23.2,4.7
-Reception,Mean BMI z-score,143.6,124.3,102.2,32.5,33.6,24.2,16.7,8.5,0.7,10.5,0.0
-Year 6,Obesity,8.9,10.9,9.6,4.5,4.2,1.1,0.0,0.7,1.3,1.8,12.5
-Year 6,Overweight incl. obesity,25.1,27.1,26.0,16.1,16.0,8.7,5.1,0.0,1.3,5.3,5.9
-Year 6,Underweight,115.0,109.9,100.0,56.9,58.4,49.3,39.0,26.9,14.1,23.4,0.0
-Year 6,Mean BMI z-score,87.0,85.6,73.3,39.4,38.0,24.1,15.2,7.6,2.2,10.7,0.0

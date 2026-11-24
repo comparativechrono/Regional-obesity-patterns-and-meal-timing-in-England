@@ -8,7 +8,7 @@ import statsmodels.formula.api as smf
 from matplotlib.lines import Line2D
 from scipy import stats
 
-from common import OUT_DATA, OUT_TAB, YEARS, day_length
+from common import OUT_DATA, OUT_TAB, YEARS, day_length, load_results
 from plotstyle import (AXIS, COHORT_COLOUR, DIVERGING, DOUBLE_COL_IN, GRID, INK, INK2, MONTH_ABBR,
                        MUTED, REC, YR6, save, titled)
 
@@ -84,104 +84,122 @@ for i, (col, title) in enumerate(panels):
     if i == 0:
         ax.legend(loc="upper left")
 
-# Panel F: observed Sep->Jul change vs change predicted by a pure shift of the mean
+# Panel F: observed change over the autumn term (Sep->Dec) vs change predicted by a shift of the mean alone
 shift = pd.read_csv(OUT_TAB / "monthly_distribution_shift.csv")
+shift = shift[shift.period == "sep_dec"]
 ax = fig.add_subplot(gs[1, 2])
 cats = ["underweight", "owob", "obese", "severe"]
 labels = ["UW", "OW+OB", "Obese", "Severe"]
 for j, c in enumerate(COHORTS):
-    s = shift[shift.cohort == c].set_index("outcome").loc[cats]
+    s_ = shift[shift.cohort == c].set_index("outcome").loc[cats]
     xs = np.arange(len(cats)) + (-0.15 if j == 0 else 0.15)
-    ax.scatter(xs, s.observed_sep_to_jul, color=COHORT_COLOUR[c], s=22, zorder=3)
-    ax.scatter(xs, s.predicted_mean_shift_only, facecolor="white", edgecolor=COHORT_COLOUR[c], s=22, lw=1.1, zorder=3)
+    ax.scatter(xs, s_.observed_change, color=COHORT_COLOUR[c], s=22, zorder=3)
+    ax.scatter(xs, s_.predicted_mean_shift_only, facecolor="white", edgecolor=COHORT_COLOUR[c], s=22, lw=1.1, zorder=3)
 ax.axhline(0, color=AXIS, lw=0.8)
 ax.set_xticks(range(len(cats)), labels)
-ax.set_ylabel("Fitted change, Sep to Jul (pp)")
-titled(ax, "F", "Observed vs mean shift only")
+ax.set_ylabel("Change, September to December (pp)")
+titled(ax, "F", "Autumn term: observed vs mean shift")
 ax.legend(handles=[Line2D([], [], marker="o", lw=0, color=INK2, ms=4.5, label="observed"),
                    Line2D([], [], marker="o", lw=0, mfc="white", mec=INK2, ms=4.5, label="mean shift only")],
           loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=2, fontsize=6.5, handletextpad=0.2, columnspacing=0.8)
 save(fig, "Figure_2_distribution_shift")
 
 # ===========================================================================
-# Figure 3. Does the within-year pattern follow day length or the school year?
+# Figure 3. Shape of the within-year change, and the spring peak and the date of Easter
 # ===========================================================================
-resid = pd.read_csv(OUT_TAB / "monthly_obesity_residuals_after_trend.csv")
-reset = pd.read_csv(OUT_TAB / "monthly_september_reset.csv")
-fig = plt.figure(figsize=(DOUBLE_COL_IN, 5.6))
-gs = fig.add_gridspec(2, 2, hspace=0.55, wspace=0.36)
+R = load_results()
+means = pd.read_csv(OUT_TAB / "monthly_means_by_month.csv")
+shape = pd.read_csv(OUT_TAB / "monthly_shape_comparison.csv").set_index(["cohort", "outcome"])
+spring = pd.read_csv(OUT_TAB / "monthly_spring_by_easter.csv")
+east = pd.read_csv(OUT_TAB / "monthly_april_easter.csv")
+etests = pd.read_csv(OUT_TAB / "monthly_easter_tests.csv").set_index(["cohort", "outcome"])
+MONTH_NUM = {mm: i + 1 for i, mm in enumerate(["September", "October", "November", "December", "January", "February",
+                                               "March", "April", "May", "June", "July"])}
+
+
+def fitted_profile(cohort, col, X):
+    """Profile fitted with school-year fixed effects (data demeaned within year); returned on the
+    level scale of the year-adjusted monthly means."""
+    piv = m[m.cohort == cohort].pivot_table(index="ncmp_year", columns="acad_month", values=col)
+    Y = piv.sub(piv.mean(axis=1), axis=0).values
+    Xd = X - X.mean(axis=0)
+    b, *_ = np.linalg.lstsq(np.tile(Xd, (Y.shape[0], 1)), Y.ravel(), rcond=None)
+    return Xd @ b + piv.values.mean()
+
+
+fig = plt.figure(figsize=(DOUBLE_COL_IN, 5.5))
+gs = fig.add_gridspec(2, 2, hspace=0.6, wspace=0.34)
 for k, c in enumerate(COHORTS):
     ax = fig.add_subplot(gs[0, k])
-    s = m[m.cohort == c]
-    fit = smf.ols("pct_obese ~ C(ncmp_year) + acad_month", data=s).fit()
-    # month means after removing year-to-year level differences (re-centred on the overall mean)
-    fe = fit.params.filter(like="C(ncmp_year)").reindex(["C(ncmp_year)[T.%s]" % y for y in s.ncmp_year]).fillna(0).values
-    s = s.assign(adj=s.pct_obese - fe + fe.mean())
-    g = s.groupby("acad_month")["adj"]
-    mean = g.mean(); ci = stats.t.ppf(0.975, g.count() - 1) * g.std() / np.sqrt(g.count())
+    mm_ = means[(means.cohort == c) & (means.outcome == "obese")].sort_values("acad_month")
     ax.axvspan(0.5, 4.5, color="#f0efec", lw=0)
-    ax.text(2.5, 0.98, "days shortening", transform=ax.get_xaxis_transform(), ha="center", va="top",
-            fontsize=6, color=INK2)
-    ax.text(8, 0.98, "days lengthening", transform=ax.get_xaxis_transform(), ha="center", va="top",
-            fontsize=6, color=INK2)
-    ax.errorbar(x, mean, yerr=ci, fmt="o", color=COHORT_COLOUR[c], ms=4, elinewidth=0.8, capsize=0, zorder=3)
-    line = fit.params["Intercept"] + fe.mean() + fit.params["acad_month"] * x
-    ax.plot(x, line, color=INK2, lw=1.0, zorder=2, label="linear school-year trend")
+    ax.text(2.5, 0.98, "days shortening", transform=ax.get_xaxis_transform(), ha="center", va="top", fontsize=6,
+            color=INK2)
+    ax.text(8, 0.98, "days lengthening", transform=ax.get_xaxis_transform(), ha="center", va="top", fontsize=6,
+            color=INK2)
+    knot = MONTH_NUM[shape.loc[(c, "pct_obese"), "end_of_decline"]]
+    apr = (x == 8).astype(float)
+    fit_knot = fitted_profile(c, "pct_obese", np.column_stack([np.minimum(x, knot), apr]).astype(float))
+    fit_lin = fitted_profile(c, "pct_obese", x[:, None].astype(float))
+    ax.plot(x, fit_lin, color=MUTED, lw=1.0, ls=(0, (4, 2)), zorder=2, label="single linear trend")
+    ax.plot(x, fit_knot, color=INK2, lw=1.1, zorder=2,
+            label=f"decline to {MONTH_ABBR[knot - 1]}, then level (+ April)")
+    ax.errorbar(x, mm_.level, yerr=mm_.ci95, fmt="o", color=COHORT_COLOUR[c], ms=4, elinewidth=0.8, capsize=0,
+                zorder=3)
     ax.set_xticks(x, MONTH_ABBR)
     ax.tick_params(axis="x", labelsize=6.5)
     lo, hi = ax.get_ylim()
     ax.set_ylim(lo, hi + 0.18 * (hi - lo))
     ax.set_ylabel("Obesity prevalence (%), year-adjusted")
     titled(ax, "AB"[k], f"{c} obesity, by month measured")
-    ax.legend(loc="lower left")
+    ax.legend(loc="lower left", fontsize=6.3)
 
-# C: the September reset
+# C: spring profiles in years with an early and a late Easter (both cohorts averaged)
 ax = fig.add_subplot(gs[1, 0])
-rows = [("Reception", "owob", "Reception OW+OB"), ("Reception", "obese", "Reception obesity"),
-        ("Year 6", "owob", "Year 6 OW+OB"), ("Year 6", "obese", "Year 6 obesity")]
-for i, (c, cat, lab) in enumerate(rows):
-    r = reset[(reset.cohort == c) & (reset.outcome == cat)].iloc[0]
-    yv = len(rows) - 1 - i
-    col = COHORT_COLOUR[c]
-    ax.plot([r.ci_low, r.ci_high], [yv, yv], color=col, lw=1.4, solid_capstyle="round")
-    ax.scatter(r.observed_mean_change, yv, color=col, s=26, zorder=4)
-    ax.scatter(r.pred_school_year_trend, yv + 0.22, marker="s", facecolor="white", edgecolor=INK2, s=18, lw=0.9, zorder=3)
-    ax.scatter(r.pred_photoperiod_alone, yv - 0.22, marker="^", facecolor="white", edgecolor=INK2, s=20, lw=0.9, zorder=3)
-    ax.scatter(r.pred_photoperiod_coef_given_trend, yv - 0.22, marker="v", facecolor="white", edgecolor=INK2, s=20,
-               lw=0.9, zorder=3)
-ax.axvline(0, color=AXIS, lw=0.8)
-ax.set_yticks(range(len(rows)), [r[2] for r in rows][::-1])
-ax.set_ylim(-0.7, len(rows) - 0.3)
-ax.grid(axis="y", visible=False)
-ax.grid(axis="x", color=GRID, lw=0.5)
-ax.set_xlabel("Change from July to the following September (pp)")
-titled(ax, "C", "The September reset (12 transitions)")
-ax.legend(handles=[Line2D([], [], color=INK2, marker="o", lw=1.4, ms=4, label="observed (95% CI)"),
-                   Line2D([], [], marker="s", lw=0, mfc="white", mec=INK2, ms=4, label="school-year trend predicts"),
-                   Line2D([], [], marker="^", lw=0, mfc="white", mec=INK2, ms=4.5, label="day length predicts (alone)"),
-                   Line2D([], [], marker="v", lw=0, mfc="white", mec=INK2, ms=4.5, label="day length predicts (given trend)")],
-          loc="upper center", bbox_to_anchor=(0.45, -0.24), ncol=2, fontsize=6, handletextpad=0.3, columnspacing=1.0)
+sp = spring[(spring.cohort == "both") & (spring.outcome == "pct_obese")]
+dates = R["temporal"]["easter"]
 
-# D: residual after the linear school-year trend vs day length
-ax = fig.add_subplot(gs[1, 1])
-offsets = {1: (4, 2), 2: (4, 2), 3: (4, -1), 4: (4, -3), 5: (-14, -6), 6: (4, -6), 7: (4, -3), 8: (4, 2), 9: (-15, 3),
-           10: (3, 3), 11: (4, 1)}
-for c in COHORTS:
-    r = resid[resid.cohort == c]
-    sl = stats.linregress(r.photo, r.resid)
-    ax.scatter(r.photo, r.resid, color=COHORT_COLOUR[c], s=18, zorder=3, label=f"{c} (r = {sl.rvalue:+.2f})")
-    xx = np.linspace(7.5, 17, 10)
-    ax.plot(xx, sl.intercept + sl.slope * xx, color=COHORT_COLOUR[c], lw=1.0)
-    if c == "Reception":
-        for _, row in r.iterrows():
-            ax.annotate(MONTH_ABBR[int(row.acad_month) - 1], (row.photo, row.resid), xytext=offsets[int(row.acad_month)],
-                        textcoords="offset points", fontsize=5.5, color=INK2)
+
+def date_range(isodates):
+    ds = sorted(dt.date.fromisoformat(d).replace(year=2021) for d in isodates)   # by day of year
+    return f"{ds[0].strftime('%-d %b')} to {ds[-1].strftime('%-d %b')}"
+
+
+early_lab = f"Easter {date_range(dates['early_dates'])} (6 years)"
+late_lab = f"Easter {date_range(dates['late_dates'])} (6 years)"
+styles = {"early": dict(color=INK, ls="-", mfc=INK, label=early_lab, off=-0.08),
+          "late": dict(color=MUTED, ls=(0, (4, 2)), mfc="white", label=late_lab, off=0.08)}
+for grp, st in styles.items():
+    g = sp[sp.easter == grp].sort_values("acad_month")
+    ax.errorbar(g.acad_month + st["off"], g.deviation, yerr=g.ci95, color=st["color"], ls=st["ls"], marker="o",
+                mfc=st["mfc"], mec=st["color"], ms=4, lw=1.2, elinewidth=0.7, capsize=0, label=st["label"])
 ax.axhline(0, color=AXIS, lw=0.8)
-ax.set_xlabel("Day length at 52.5°N on the 15th of the month (hours)")
-ax.set_ylabel("Residual after linear trend (pp)")
-titled(ax, "D", "Residual obesity vs day length")
-ax.legend(loc="lower right", fontsize=6)
-save(fig, "Figure_3_school_year_vs_day_length")
+ax.set_xticks(range(5, 12), MONTH_ABBR[4:])
+ax.set_ylabel("Obesity, deviation from Jan-Jul mean (pp)")
+titled(ax, "C", "Obesity, January to July, by date of Easter")
+ax.legend(loc="lower left", fontsize=6.3)
+
+# D: April minus May against the date of Easter
+ax = fig.add_subplot(gs[1, 1])
+v = east["both|pct_obese|apr_minus_may"]
+is_early = east.easter_doy < dates["median_easter_doy"]
+ax.scatter(east.easter_doy[is_early], v[is_early], s=26, color=INK, zorder=3)
+ax.scatter(east.easter_doy[~is_early], v[~is_early], s=26, facecolor="white", edgecolor=MUTED, lw=1.1, zorder=3)
+sl = stats.linregress(east.easter_doy, v)
+xx = np.linspace(east.easter_doy.min() - 2, east.easter_doy.max() + 2, 10)
+ax.plot(xx, sl.intercept + sl.slope * xx, color=INK2, lw=0.9)
+ax.axhline(0, color=AXIS, lw=0.8)
+tick_dates = [dt.date(2021, 3, 22), dt.date(2021, 4, 1), dt.date(2021, 4, 10), dt.date(2021, 4, 20)]
+ax.set_xticks([d.timetuple().tm_yday for d in tick_dates], [d.strftime("%-d %b") for d in tick_dates])
+t = etests.loc[("both", "pct_obese")]
+lo, hi = ax.get_ylim()
+ax.set_ylim(lo, hi + 0.3 * (hi - lo))
+ax.text(0.97, 0.97, f"r = {t.r_easter:.2f}, permutation p = {t.p_easter_permutation:.3f}; 12 school years",
+        transform=ax.transAxes, ha="right", va="top", fontsize=6.5, color=INK2)
+ax.set_xlabel("Date of Easter Sunday")
+ax.set_ylabel("Obesity, April minus May (pp)")
+titled(ax, "D", "April minus May, by date of Easter")
+save(fig, "Figure_3_within_year_shape_and_easter")
 
 # ===========================================================================
 # Figure 4. Double-plotted actograms (phase locked to the school year)
@@ -219,51 +237,55 @@ cb.outline.set_visible(False)
 save(fig, "Figure_4_actograms")
 
 # ===========================================================================
-# Figure 5. Latitude coefficients: Model A (IMD) and Model B (IMD + child ethnic composition)
+# Figure 5. Latitude coefficients, 2023/24-2025/26 pooled: Model A (IMD) and Model B (+ ethnic composition)
 # ===========================================================================
 gm = pd.read_csv(OUT_TAB / "geo_models.csv")
-fig, axes = plt.subplots(1, 4, figsize=(DOUBLE_COL_IN, 3.9), gridspec_kw={"wspace": 0.3})
+gy = pd.read_csv(OUT_TAB / "geo_models_by_year.csv")
+fig, axes = plt.subplots(1, 4, figsize=(DOUBLE_COL_IN, 2.9), gridspec_kw={"wspace": 0.3})
 thresholds = [("uw", "Underweight"), ("owob", "Overweight + obesity"), ("ob", "Obesity"), ("sev", "Severe obesity")]
-rows = [(coh, yr) for coh in ("rec", "yr6") for yr in YEARS]
+rows = [("rec", "A"), ("rec", "B"), ("yr6", "A"), ("yr6", "B")]
 for k, (suffix, title) in enumerate(thresholds):
     ax = axes[k]
-    for i, (coh, yr) in enumerate(rows):
+    for i, (coh, model) in enumerate(rows):
         key = f"{coh}_{suffix}"
         col = REC if coh == "rec" else YR6
-        base = len(rows) - 1 - i + (0.4 if coh == "rec" else 0)
-        for model, dy, filled in (("A", 0.17, False), ("B", -0.17, True)):
-            p = gm[(gm.indicator == key) & (gm.year == yr) & (gm.model == model)].iloc[0]
-            yv = base + dy
-            ax.plot([p.conley100_ci_low, p.conley100_ci_high], [yv, yv], color=col, lw=1.2 if filled else 0.9,
-                    solid_capstyle="round", alpha=1 if filled else 0.75)
-            ax.scatter(p.lat_beta, yv, s=20 if filled else 18, zorder=3, facecolor=col if filled else "white",
-                       edgecolor=col, lw=1.0)
+        yv = len(rows) - 1 - i + (0.35 if coh == "rec" else 0)
+        p = gm[(gm.indicator == key) & (gm.model == model)].iloc[0]
+        filled = model == "B"
+        ax.plot([p.conley100_ci_low, p.conley100_ci_high], [yv, yv], color=col, lw=1.3, solid_capstyle="round")
+        ax.scatter(p.lat_beta, yv, s=24, zorder=3, facecolor=col if filled else "white", edgecolor=col, lw=1.1)
+        yr = gy[(gy.indicator == key) & (gy.model == model)]
+        ax.scatter(yr.lat_beta, np.full(len(yr), yv - 0.22), s=7, marker="|", color=INK2, lw=0.8, zorder=2)
     ax.axvline(0, color=AXIS, lw=0.8)
-    ticks = [len(rows) - 1 - i + (0.4 if c == "rec" else 0) for i, (c, _) in enumerate(rows)]
-    ax.set_yticks(ticks, [f"{'Reception' if c == 'rec' else 'Year 6'} {y}" for c, y in rows] if k == 0 else [])
-    ax.set_ylim(-0.6, len(rows) - 0.0)
+    ticks = [len(rows) - 1 - i + (0.35 if c == "rec" else 0) for i, (c, _) in enumerate(rows)]
+    ax.set_yticks(ticks, [f"{'Reception' if c == 'rec' else 'Year 6'}, Model {mdl}" for c, mdl in rows] if k == 0 else [])
+    ax.set_ylim(-0.6, len(rows) - 0.25)
     ax.grid(axis="y", visible=False)
     ax.grid(axis="x", color=GRID, lw=0.5)
     ax.set_xlabel("pp per degree north")
     titled(ax, "ABCD"[k], title)
-handles = [Line2D([], [], color=INK2, marker="o", lw=0.9, ms=4, mfc="white", label="Model A: adjusted for IMD"),
-           Line2D([], [], color=INK2, marker="o", lw=1.2, ms=4, label="Model B: adjusted for IMD and child ethnic composition")]
-fig.legend(handles=handles, loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.09))
+handles = [Line2D([], [], color=INK2, marker="o", lw=1.3, ms=4.5, mfc="white", label="Model A: adjusted for IMD"),
+           Line2D([], [], color=INK2, marker="o", lw=1.3, ms=4.5, label="Model B: adjusted for IMD and child ethnic composition"),
+           Line2D([], [], color=INK2, marker="|", lw=0, ms=6, label="each NCMP year separately")]
+fig.legend(handles=handles, loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.1), fontsize=6.5)
 save(fig, "Figure_5_latitude_coefficients")
 
 # ===========================================================================
-# Figure 6. Maps: what latitude stands in for (2023/24)
+# Figure 6. Maps: what latitude stands in for (authority means of residuals, 2023/24-2025/26)
 # ===========================================================================
 import maps  # noqa: E402
 
 ETH = ["pct_asian", "pct_black", "pct_mixed", "pct_other_ethnic"]
-la = pd.read_csv(OUT_DATA / "la_dataset_2023_24.csv")
+panel_la = pd.concat([pd.read_csv(OUT_DATA / f"la_dataset_{y.replace('/', '_')}.csv").assign(year=y) for y in YEARS],
+                     ignore_index=True)
 
 
 def residual_map_values(key, covariates):
-    d = la[la[key].notna()]
-    f = smf.ols(f"{key} ~ " + " + ".join(covariates), data=d).fit()
-    return dict(zip(d.la_code, f.resid))
+    """Residuals from the pooled model without latitude (year effects + covariates), averaged
+    over the three years within each authority."""
+    d = panel_la[panel_la[key].notna()]
+    f = smf.ols(f"{key} ~ C(year) + " + " + ".join(covariates), data=d).fit()
+    return d.assign(r=f.resid).groupby("la_code")["r"].mean().to_dict()
 
 
 fig, axes = plt.subplots(1, 3, figsize=(DOUBLE_COL_IN, 3.7), gridspec_kw={"wspace": 0.04})
@@ -273,11 +295,11 @@ panels = [("rec_uw", ["imd_score"], "Reception underweight\n      adjusted for I
 for k, (key, covs, title) in enumerate(panels):
     ax = axes[k]
     vals = residual_map_values(key, covs)
-    v = 1.2 if key == "rec_uw" else float(np.nanpercentile(np.abs(list(vals.values())), 97))
+    v = 1.0 if key == "rec_uw" else float(np.nanpercentile(np.abs(list(vals.values())), 97))
     sm = maps.draw(ax, vals, DIVERGING, -v, v)
     ax.set_title(f"{'ABC'[k]}   {title}", loc="left", fontsize=8, fontweight="semibold", color=INK, pad=4)
-    cb = fig.colorbar(sm, ax=ax, orientation="horizontal", fraction=0.045, pad=0.02, aspect=22)
+    cb = fig.colorbar(sm, ax=ax, orientation="horizontal", fraction=0.045, pad=0.02, aspect=20, shrink=0.82)
     cb.outline.set_visible(False)
     cb.ax.tick_params(labelsize=6)
-    cb.set_label("Residual prevalence (pp)", fontsize=6.5, color=INK2)
+    cb.set_label("Residual prevalence (pp), 3-year mean", fontsize=6.5, color=INK2)
 save(fig, "Figure_6_residual_maps")

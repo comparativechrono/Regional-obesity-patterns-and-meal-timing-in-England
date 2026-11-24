@@ -1,0 +1,5 @@
+Outcome,"Month pattern shared by the cohorts: F (df), p","Cohorts' patterns differ: F (df), p",r between the cohorts' non-linear patterns,Shared pattern: lowest / highest month,r of shared pattern with day length,Reception minus Year 6 linear change per month (95% CI)
+Obesity,"5.7 (9,229), <0.001","2.02 (9,220), 0.039",0.71,January / September,+0.92 (<0.001),-0.116 (-0.164 to -0.069)
+Overweight incl. obesity,"7.9 (9,229), <0.001","1.61 (9,220), 0.11",0.80,December / April,+0.64 (0.035),-0.290 (-0.353 to -0.227)
+Underweight,"11.2 (9,229), <0.001","2.88 (9,220), 0.003",0.62,April / July,-0.33 (0.33),-0.006 (-0.015 to +0.003)
+Mean BMI z-score,"11.8 (9,229), <0.001","0.50 (9,220), 0.88",0.95,December / April,+0.68 (0.020),-0.0058 (-0.0078 to -0.0039)

@@ -5,13 +5,17 @@ import pandas as pd
 import statsmodels.formula.api as smf
 from scipy import stats
 
-from common import INDICATORS, OUT_DATA, day_length, photoperiod_amplitude
-from plotstyle import (AXIS, COHORT_COLOUR, DIVERGING, DOUBLE_COL_IN, GRID, INK2, MONTH_ABBR, MUTED,
+from common import INDICATORS, OUT_DATA, OUT_TAB, YEARS, day_length, load_results
+from plotstyle import (AXIS, COHORT_COLOUR, DIVERGING, DOUBLE_COL_IN, GRID, INK, INK2, MONTH_ABBR, MUTED,
                        save, titled)
 
 m_all = pd.read_csv(OUT_DATA / "ncmp_monthly.csv")
 m = m_all[m_all.complete_year].copy()
-la = pd.read_csv(OUT_DATA / "la_dataset_2023_24.csv")
+panel = pd.concat([pd.read_csv(OUT_DATA / f"la_dataset_{y.replace('/', '_')}.csv").assign(year=y) for y in YEARS],
+                  ignore_index=True)
+la = panel[panel.year == YEARS[0]].copy()           # authority characteristics (identical in every year)
+la_mean = panel.groupby("la_code")[list(INDICATORS)].mean()   # three-year mean prevalence
+la = la.drop(columns=list(INDICATORS)).merge(la_mean, left_on="la_code", right_index=True)
 COHORTS = ["Reception", "Year 6"]
 CATS = [("underweight", "Underweight"), ("healthy", "Healthy weight"), ("overweight", "Overweight"),
         ("obese", "Obesity"), ("severe", "Severe obesity")]
@@ -130,33 +134,47 @@ row_labels(fig, axes, COHORTS)
 save(fig, "Figure_S4_waveform_overlays")
 
 # ---------------------------------------------------------------------------
-# S5. Linear cosinor fits to the full monthly series
+# S5. January-July profiles in years with an early and a late Easter, every category
 # ---------------------------------------------------------------------------
-fig, axes = plt.subplots(2, 5, figsize=(DOUBLE_COL_IN, 3.9), gridspec_kw={"wspace": 0.45, "hspace": 0.6})
+spring = pd.read_csv(OUT_TAB / "monthly_spring_by_easter.csv")
+SPRING = [("pct_underweight", "Underweight"), ("pct_owob", "OW+OB"), ("pct_obese", "Obesity"),
+          ("pct_severe", "Severe obesity"), ("z_mean", "Mean BMI z (SD)")]
+fig, axes = plt.subplots(2, 5, figsize=(DOUBLE_COL_IN, 4.0), gridspec_kw={"wspace": 0.5, "hspace": 0.6})
 for r_, c in enumerate(COHORTS):
-    for k, (cat, lab) in enumerate(CATS):
+    for k, (col, lab) in enumerate(SPRING):
         ax = axes[r_, k]
-        s = m[m.cohort == c].copy()
-        s["tc"] = s.t_years - s.t_years.mean()
-        s["cosw"], s["sinw"] = np.cos(2 * np.pi * s.t_years), np.sin(2 * np.pi * s.t_years)
-        f = smf.ols(f"pct_{cat} ~ tc + cosw + sinw", data=s).fit()
-        tt = np.linspace(s.t_years.min(), s.t_years.max(), 800)
-        pred = f.params["Intercept"] + f.params["tc"] * (tt - s.t_years.mean()) + f.params["cosw"] * np.cos(2 * np.pi * tt) + f.params["sinw"] * np.sin(2 * np.pi * tt)
-        ax.scatter(s.t_years, s[f"pct_{cat}"], s=3, color=COHORT_COLOUR[c], alpha=0.6, lw=0)
-        ax.plot(tt, pred, color="#0b0b0b", lw=0.8)
-        amp = np.hypot(f.params["cosw"], f.params["sinw"])
-        ax.text(0.03, 0.97, f"A = {amp:.2f} pp", transform=ax.transAxes, va="top", fontsize=6, color=INK2)
-        ax.set_xticks([2008, 2012, 2016, 2019], ["2008", "2012", "2016", "2019"])
-        ax.tick_params(labelsize=6)
+        for grp, colr, ls, mfc, off in (("early", INK, "-", INK, -0.08), ("late", MUTED, (0, (4, 2)), "white", 0.08)):
+            g = spring[(spring.cohort == c) & (spring.outcome == col) & (spring.easter == grp)].sort_values("acad_month")
+            ax.errorbar(g.acad_month + off, g.deviation, yerr=g.ci95, color=colr, ls=ls, marker="o", mfc=mfc, mec=colr,
+                        ms=2.6, lw=0.9, elinewidth=0.6, capsize=0)
+        ax.axhline(0, color=AXIS, lw=0.6)
+        ax.set_xticks([5, 7, 9, 11], ["Jan", "Mar", "May", "Jul"])
+        ax.tick_params(labelsize=5.8)
         if k == 0:
-            ax.set_ylabel("Prevalence (%)")
+            ax.set_ylabel("Deviation from Jan-Jul mean (pp)", fontsize=6.5)
         titled(ax, LETTERS[r_ * 5 + k], lab)
         ax.title.set_fontsize(6.8)
+from matplotlib.lines import Line2D  # noqa: E402
+
+import datetime as dt  # noqa: E402
+
+E = load_results()["temporal"]["easter"]
+
+
+def date_range(isodates):
+    ds = sorted(dt.date.fromisoformat(d).replace(year=2021) for d in isodates)   # by day of year
+    return f"Easter {ds[0].strftime('%-d %B')} to {ds[-1].strftime('%-d %B')} ({len(ds)} years)"
+
+
+fig.legend(handles=[Line2D([], [], color=INK, marker="o", ms=3.5, lw=1.0, label=date_range(E["early_dates"])),
+                    Line2D([], [], color=MUTED, marker="o", mfc="white", ms=3.5, lw=1.0, ls=(0, (4, 2)),
+                           label=date_range(E["late_dates"]))],
+           loc="lower center", ncol=2, bbox_to_anchor=(0.5, -0.04), fontsize=6.8)
 row_labels(fig, axes, COHORTS)
-save(fig, "Figure_S5_cosinor_fits")
+save(fig, "Figure_S5_spring_by_easter")
 
 # ---------------------------------------------------------------------------
-# S6-S8. Geographic: raw associations, added-variable plots, residual maps (2023/24)
+# S6-S8. Geographic: raw associations, added-variable plots, residual maps (2023/24-2025/26)
 # ---------------------------------------------------------------------------
 order = list(INDICATORS)
 titles = {k: v[3] for k, v in INDICATORS.items()}
@@ -174,7 +192,7 @@ for i, key in enumerate(order):
             va="top", fontsize=5.8, color=INK2)
     ax.set_xlabel("Latitude (°N)", fontsize=6.5)
     if i % 4 == 0:
-        ax.set_ylabel("Prevalence (%)")
+        ax.set_ylabel("Prevalence (%), 3-year mean")
     ax.tick_params(labelsize=6)
     titled(ax, LETTERS[i], titles[key])
     ax.title.set_fontsize(6.8)
@@ -184,26 +202,30 @@ save(fig, "Figure_S6_raw_latitude_associations")
 ETH = ["pct_asian", "pct_black", "pct_mixed", "pct_other_ethnic"]
 MODEL_COVS = {"A": ["imd_score"], "B": ["imd_score"] + ETH}
 
-# S7. Added-variable (partial regression) plots for latitude, Model A and Model B
+# S7. Added-variable (partial regression) plots for latitude, Models A and B, pooled 2023/24-2025/26.
+# Prevalence and latitude are each residualised on year and the model covariates in the stacked data;
+# points are authority means of the residuals over the three years, the line is the pooled estimate.
+gm = pd.read_csv(OUT_TAB / "geo_models.csv")
 fig, axes = plt.subplots(4, 4, figsize=(DOUBLE_COL_IN, 7.6), gridspec_kw={"wspace": 0.42, "hspace": 0.75})
 for ci_, cohort_prefix in enumerate(["rec", "yr6"]):
     keys = [k for k in order if k.startswith(cohort_prefix)]
     for mi, model in enumerate(["A", "B"]):
         r_ = 2 * ci_ + mi
-        covs = " + ".join(MODEL_COVS[model])
+        covs = "C(year) + " + " + ".join(MODEL_COVS[model])
         for j, key in enumerate(keys):
             ax = axes[r_, j]
-            d = la[la[key].notna()]
+            d = panel[panel[key].notna()]
             ry = smf.ols(f"{key} ~ {covs}", data=d).fit().resid
             rx = smf.ols(f"latitude ~ {covs}", data=d).fit().resid
-            full = smf.ols(f"{key} ~ {covs} + latitude", data=d).fit(cov_type="HC1")
+            pts = pd.DataFrame({"la": d.la_code, "rx": rx, "ry": ry}).groupby("la")[["rx", "ry"]].mean()
+            g = gm[(gm.indicator == key) & (gm.model == model)].iloc[0]
             col = COHORT_COLOUR[INDICATORS[key][1]]
-            ax.scatter(rx, ry, s=6, color=col, alpha=0.7 if model == "B" else 0.45, lw=0)
-            xx = np.linspace(rx.min(), rx.max(), 10)
-            ax.plot(xx, full.params["latitude"] * xx, color="#0b0b0b", lw=0.9)
+            ax.scatter(pts.rx, pts.ry, s=6, color=col, alpha=0.7 if model == "B" else 0.45, lw=0)
+            xx = np.linspace(pts.rx.min(), pts.rx.max(), 10)
+            ax.plot(xx, g.lat_beta * xx, color="#0b0b0b", lw=0.9)
             ax.axhline(0, color=AXIS, lw=0.5)
-            p = full.pvalues["latitude"]
-            ax.text(0.03, 0.97, f"β = {full.params['latitude']:+.2f}\np {'< 0.001' if p < 0.001 else f'= {p:.3f}'}",
+            p = g.lat_p
+            ax.text(0.03, 0.97, f"β = {g.lat_beta:+.2f}\np {'< 0.001' if p < 0.001 else f'= {p:.3f}'}",
                     transform=ax.transAxes, va="top", fontsize=5.8, color=INK2)
             ax.set_xlabel("Latitude | covariates (°)", fontsize=6)
             if j == 0:
@@ -220,10 +242,11 @@ import maps  # noqa: E402
 fig, axes = plt.subplots(2, 4, figsize=(DOUBLE_COL_IN, 5.2), gridspec_kw={"wspace": 0.04, "hspace": 0.12})
 for i, key in enumerate(order):
     ax = axes[i // 4, i % 4]
-    d = la[la[key].notna()]
-    res = smf.ols(f"{key} ~ " + " + ".join(MODEL_COVS["B"]), data=d).fit().resid
+    d = panel[panel[key].notna()]
+    res = d.assign(r=smf.ols(f"{key} ~ C(year) + " + " + ".join(MODEL_COVS["B"]), data=d).fit().resid)
+    res = res.groupby("la_code")["r"].mean()
     v = float(np.nanpercentile(np.abs(res), 97))
-    sm = maps.draw(ax, dict(zip(d.la_code, res)), DIVERGING, -v, v, inset_rect=(0.68, 0.58, 0.34, 0.30))
+    sm = maps.draw(ax, res.to_dict(), DIVERGING, -v, v, inset_rect=(0.68, 0.58, 0.34, 0.30))
     titled(ax, LETTERS[i], titles[key])
     ax.title.set_fontsize(6.8)
     cb = fig.colorbar(sm, ax=ax, orientation="horizontal", fraction=0.04, pad=0.01, aspect=18)
@@ -255,8 +278,8 @@ for k, key in enumerate(["rec_uw", "yr6_uw"]):
     ax.plot(xx, sl.intercept + sl.slope * xx, color="#0b0b0b", lw=0.9)
     ax.text(0.03, 0.97, f"r = {sl.rvalue:+.2f}, N = {len(d)}", transform=ax.transAxes, va="top", fontsize=6.5, color=INK2)
     ax.set_xlabel("Dependent children who are Asian (%)")
-    ax.set_ylabel("Underweight prevalence (%)")
-    titled(ax, "CD"[k], f"{INDICATORS[key][1]} underweight, 2023/24")
+    ax.set_ylabel("Underweight prevalence (%), 3-year mean")
+    titled(ax, "CD"[k], f"{INDICATORS[key][1]} underweight, 2023/24-2025/26 mean")
 save(fig, "Figure_S10_ethnic_composition")
 
 # ---------------------------------------------------------------------------

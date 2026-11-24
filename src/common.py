@@ -51,13 +51,11 @@ INDICATORS = {
 }
 FINGERTIPS_IDS = {k: v[0].replace("indicator", "").replace(".csv", "") for k, v in INDICATORS.items()}
 
-PRIMARY_YEAR = "2023/24"
-REPLICATION_YEAR = "2024/25"
-SECOND_REPLICATION_YEAR = "2025/26"   # published November 2026; added as a further out-of-sample test
-YEARS = [PRIMARY_YEAR, REPLICATION_YEAR, SECOND_REPLICATION_YEAR]
+# NCMP years in the local-authority analysis (analysed together; 2025/26 published November 2026)
+YEARS = ["2023/24", "2024/25", "2025/26"]
 # 2023/24 and 2024/25 come from the original Fingertips exports in data/raw/; 2025/26 from the
 # Fingertips API files in data/raw/fingertips_api/ (identical to the exports for the earlier years).
-FINGERTIPS_DIR = {PRIMARY_YEAR: RAW, REPLICATION_YEAR: RAW, SECOND_REPLICATION_YEAR: RAW / "fingertips_api"}
+FINGERTIPS_DIR = {"2023/24": RAW, "2024/25": RAW, "2025/26": RAW / "fingertips_api"}
 
 # UK90 population-monitoring cut-points (NCMP definitions) as z-scores
 CUTPOINTS = {
@@ -137,6 +135,25 @@ def manual_hc1(y, X):
     meat = (Xm * e[:, None] ** 2).T @ Xm * n / (n - k)
     se = np.sqrt(np.diag(xtx_inv @ meat @ xtx_inv))
     return beta, se
+
+
+def manual_cr1(y, X, groups):
+    """Independent cluster-robust (CR1) implementation used to cross-check statsmodels:
+    V = c (X'X)^-1 [sum_g X_g' e_g e_g' X_g] (X'X)^-1, c = G/(G-1) * (n-1)/(n-k)."""
+    y = np.asarray(y, dtype=float)
+    X = np.asarray(X, dtype=float)
+    n, k = X.shape
+    beta, *_ = np.linalg.lstsq(X, y, rcond=None)
+    e = y - X @ beta
+    bread = np.linalg.inv(X.T @ X)
+    codes, uniq = pd.factorize(np.asarray(groups))
+    G = len(uniq)
+    meat = np.zeros((k, k))
+    for g in range(G):
+        s = X[codes == g].T @ e[codes == g]
+        meat += np.outer(s, s)
+    V = bread @ meat @ bread * G / (G - 1) * (n - 1) / (n - k)
+    return beta, np.sqrt(np.diag(V))
 
 
 def partial_r(fit_classical, term: str) -> float:

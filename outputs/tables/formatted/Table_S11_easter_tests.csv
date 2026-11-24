@@ -1,0 +1,13 @@
+Cohort,Outcome,r with date of Easter (permutation p),"r, leaving out one year at a time",Early-Easter years: mean April minus May,Late-Easter years: mean April minus May,Difference (p),r with date British Summer Time began
+Reception,Obesity,-0.59 (0.043),-0.77 to -0.43,+0.606,+0.116,+0.489 (0.068),-0.07
+Reception,Overweight incl. obesity,-0.65 (0.021),-0.85 to -0.50,+1.234,+0.411,+0.824 (0.10),-0.15
+Reception,Mean BMI z-score,-0.63 (0.024),-0.78 to -0.47,+0.031,+0.006,+0.024 (0.15),+0.04
+Reception,Underweight,+0.49 (0.10),+0.35 to +0.64,-0.064,-0.003,-0.061 (0.37),-0.16
+Year 6,Obesity,-0.60 (0.043),-0.76 to -0.51,+0.414,-0.349,+0.762 (0.034),-0.25
+Year 6,Overweight incl. obesity,-0.65 (0.025),-0.75 to -0.57,+0.716,-0.168,+0.884 (0.061),-0.14
+Year 6,Mean BMI z-score,-0.46 (0.13),-0.64 to -0.30,+0.022,-0.002,+0.023 (0.15),-0.20
+Year 6,Underweight,-0.09 (0.77),-0.46 to +0.03,-0.076,-0.092,+0.016 (0.85),+0.04
+Mean of both cohorts,Obesity,-0.63 (0.034),-0.81 to -0.52,+0.510,-0.116,+0.626 (0.034),-0.18
+Mean of both cohorts,Overweight incl. obesity,-0.69 (0.017),-0.84 to -0.58,+0.975,+0.121,+0.854 (0.063),-0.16
+Mean of both cohorts,Mean BMI z-score,-0.63 (0.029),-0.84 to -0.52,+0.026,+0.002,+0.024 (0.093),-0.09
+Mean of both cohorts,Underweight,+0.21 (0.50),+0.00 to +0.43,-0.070,-0.047,-0.023 (0.71),-0.06

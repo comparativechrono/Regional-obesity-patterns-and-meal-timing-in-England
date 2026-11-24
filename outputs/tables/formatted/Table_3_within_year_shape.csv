@@ -1,0 +1,9 @@
+Cohort,Outcome,dAIC: single linear trend,dAIC: linear trend + April,"dAIC: decline, then level + April",dAIC: linear trend + day length + April,dAIC: month effects,End of decline (bootstrap % December or January),Decline-then-level vs month effects: lack-of-fit p
+Reception,Obesity,56.3,52.1,0.0,5.1,8.6,January (80%),0.80
+Reception,Overweight incl. obesity,34.7,17.8,25.8,5.8,0.0,June (0%),<0.001
+Reception,Underweight,33.6,28.7,37.3,30.5,0.0,June (0%),<0.001
+Reception,Mean BMI z-score,32.5,22.7,30.4,6.6,0.0,June (6%),<0.001
+Year 6,Obesity,4.6,5.9,2.2,1.5,12.6,December (35%),0.93
+Year 6,Overweight incl. obesity,16.8,10.8,2.0,0.0,6.6,December (68%),0.43
+Year 6,Underweight,56.9,45.1,41.9,26.5,0.0,January (77%),<0.001
+Year 6,Mean BMI z-score,39.4,31.9,18.3,7.1,0.0,January (91%),<0.001
