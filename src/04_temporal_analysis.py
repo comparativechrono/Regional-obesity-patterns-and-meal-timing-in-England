@@ -278,7 +278,9 @@ sens = []
 extra = df_all[(df_all.ncmp_year == "2019/20") & (df_all.acad_month <= 6)]
 for label, data in {"primary (2007/08-2018/19)": df,
                     "plus 2019/20 Sep-Feb": pd.concat([df, extra]),
-                    "excluding 2007/08-2008/09": df[~df.ncmp_year.isin(["2007/08", "2008/09"])]}.items():
+                    "excluding 2007/08-2008/09": df[~df.ncmp_year.isin(["2007/08", "2008/09"])],
+                    "before universal infant free school meals (2007/08-2013/14)": df[df.ncmp_year < "2014/15"],
+                    "after universal infant free school meals (2014/15-2018/19)": df[df.ncmp_year >= "2014/15"]}.items():
     for c in COHORTS:
         s = data[data.cohort == c]
         f = cluster_fit("pct_obese ~ C(ncmp_year) + acad_month", s)
@@ -289,6 +291,17 @@ for label, data in {"primary (2007/08-2018/19)": df,
 sens = pd.DataFrame(sens)
 sens.to_csv(OUT_TAB / "monthly_sensitivity.csv", index=False)
 
+# Did the within-year slope change when universal infant free school meals began (September 2014)?
+uifsm = []
+for c in COHORTS:
+    s_ = df[df.cohort == c].assign(post=lambda d: (d.ncmp_year >= "2014/15").astype(int))
+    for y in ["pct_obese", "pct_owob", "pct_underweight", "z_mean"]:
+        f = cluster_fit(f"{y} ~ C(ncmp_year) + acad_month + acad_month:post", s_)
+        uifsm.append({"cohort": c, "outcome": y, "slope_before": f.params["acad_month"],
+                      "slope_change_after": f.params["acad_month:post"], "p_change": f.pvalues["acad_month:post"]})
+uifsm = pd.DataFrame(uifsm)
+uifsm.to_csv(OUT_TAB / "monthly_slope_before_after_uifsm.csv", index=False)
+
 
 results.update({
     "trends": trends.set_index(["cohort", "outcome"]).to_dict(orient="index"),
@@ -298,6 +311,7 @@ results.update({
     "distribution_shift": shift.to_dict(orient="records"),
     "sensitivity": sens.to_dict(orient="records"),
     "september_reset": reset.to_dict(orient="records"),
+    "slope_before_after_uifsm": uifsm.to_dict(orient="records"),
 })
 # JSON keys must be strings
 results = {k: ({"|".join(kk) if isinstance(kk, tuple) else kk: vv for kk, vv in v.items()} if isinstance(v, dict) else v)
@@ -317,6 +331,7 @@ print("residual~photoperiod r:", resid_corr)
 print("\nDISTRIBUTION SHIFT"); print(shift.round(3).to_string(index=False)); print(results["distribution"])
 print("\nSENSITIVITY"); print(sens.round(4).to_string(index=False))
 print("\nSEPTEMBER RESET"); print(reset.round(3).to_string(index=False))
+print("\nSLOPE BEFORE/AFTER UIFSM"); print(uifsm.round(4).to_string(index=False))
 print("photoperiod vs school month R2:", results["photoperiod_vs_school_month_r2"])
 print(comp[["cohort", "outcome", "aic_school-year trend", "aic_quadratic trend", "aic_two-phase trend", "aic_trend + photoperiod",
             "aic_two-phase trend + photoperiod", "aic_month FE (saturated)", "photo_coef_given_trend", "photo_coef_given_trend_clustered_p",

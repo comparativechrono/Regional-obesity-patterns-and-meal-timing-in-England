@@ -1,0 +1,11 @@
+Sample,Cohort,Months,"Obesity slope, pp per month (p)","Day-length coefficient given linear trend, pp per hour (p)"
+primary (2007/08-2018/19),Reception,132,-0.147 (<0.001),+0.120 (<0.001)
+primary (2007/08-2018/19),Year 6,132,-0.031 (0.12),+0.044 (0.032)
+plus 2019/20 Sep-Feb,Reception,138,-0.151 (<0.001),+0.127 (<0.001)
+plus 2019/20 Sep-Feb,Year 6,138,-0.031 (0.11),+0.045 (0.018)
+excluding 2007/08-2008/09,Reception,110,-0.147 (<0.001),+0.129 (<0.001)
+excluding 2007/08-2008/09,Year 6,110,-0.026 (0.26),+0.041 (0.092)
+before universal infant free school meals (2007/08-2013/14),Reception,77,-0.132 (<0.001),+0.075 (0.022)
+before universal infant free school meals (2007/08-2013/14),Year 6,77,-0.026 (0.20),+0.029 (0.16)
+after universal infant free school meals (2014/15-2018/19),Reception,55,-0.167 (<0.001),+0.182 (<0.001)
+after universal infant free school meals (2014/15-2018/19),Year 6,55,-0.038 (0.36),+0.065 (0.11)

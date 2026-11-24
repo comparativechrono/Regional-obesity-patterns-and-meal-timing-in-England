@@ -72,7 +72,7 @@ src/
   04_temporal_analysis.py      timing, within-year trends, cosinor, day length vs school year, reset
   05_figures_main.py           Figures 1-6
   06_figures_supplementary.py  Figures S1-S10
-  07_tables.py                 formatted Tables 1-4 and S1-S8
+  07_tables.py                 formatted Tables 1-4 and S1-S9
   photoperiod.py               stand-alone day length / sunrise / sunset calculator
 outputs/
   data/                        analysis datasets (LA x year; national monthly series)
@@ -108,7 +108,7 @@ Figures use the Inter typeface if it is installed and fall back to Arial or Deja
 | Figure 5 | `outputs/figures/Figure_5_latitude_coefficients` |
 | Figure 6 | `outputs/figures/Figure_6_residual_maps` |
 | Figures S1–S10 | `outputs/figures/Figure_S*` |
-| Tables 1–4, S1–S8 | `outputs/tables/formatted/*.csv` and `outputs/tables/manuscript_tables.xlsx` |
+| Tables 1–4, S1–S9 | `outputs/tables/formatted/*.csv` and `outputs/tables/manuscript_tables.xlsx` |
 
 ## Photoperiod calculator
 

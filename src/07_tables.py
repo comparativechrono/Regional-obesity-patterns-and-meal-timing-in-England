@@ -1,4 +1,4 @@
-"""Step 7: formatted tables for the manuscript (main Tables 1-4, supplementary Tables S1-S8).
+"""Step 7: formatted tables for the manuscript (main Tables 1-4, supplementary Tables S1-S9).
 
 Every number is read from outputs/ (results.json and the analysis tables) -- nothing is typed in.
 Writes outputs/tables/formatted/*.csv and one workbook, outputs/tables/manuscript_tables.xlsx.
@@ -190,6 +190,13 @@ for c in cmp_cols:
 aic.columns = ["Cohort", "Outcome"] + [f"dAIC: {c}" for c in cmp_cols]
 aic["Outcome"] = aic["Outcome"].map(labels)
 tables["Table_S7_model_comparison_AIC"] = aic
+
+sens = pd.read_csv(OUT_TAB / "monthly_sensitivity.csv")
+tables["Table_S9_temporal_sensitivity"] = pd.DataFrame({
+    "Sample": sens["sample"], "Cohort": sens.cohort, "Months": sens.n_months,
+    "Obesity slope, pp per month (p)": sens.apply(lambda r: f"{r.obese_slope:+.3f} ({p_fmt(r.obese_slope_p)})", axis=1),
+    "Day-length coefficient given linear trend, pp per hour (p)": sens.apply(
+        lambda r: f"{r.photo_given_trend:+.3f} ({p_fmt(r.photo_given_trend_p)})", axis=1)})
 
 # Photoperiod model check: CBM (used in the paper) vs the NOAA solar-position algorithm
 val = []

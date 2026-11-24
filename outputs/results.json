@@ -6860,6 +6860,42 @@
         "photo_given_trend": 0.040885258889246504,
         "photo_given_trend_p": 0.09194424153808406,
         "sample": "excluding 2007/08-2008/09"
+      },
+      {
+        "cohort": "Reception",
+        "n_months": 77,
+        "obese_slope": -0.1324795104093502,
+        "obese_slope_p": 2.3751385508011328e-12,
+        "photo_given_trend": 0.07490033100891438,
+        "photo_given_trend_p": 0.021675344044906102,
+        "sample": "before universal infant free school meals (2007/08-2013/14)"
+      },
+      {
+        "cohort": "Year 6",
+        "n_months": 77,
+        "obese_slope": -0.025558208849349905,
+        "obese_slope_p": 0.2049012275598866,
+        "photo_given_trend": 0.02875663661718532,
+        "photo_given_trend_p": 0.1570536906282205,
+        "sample": "before universal infant free school meals (2007/08-2013/14)"
+      },
+      {
+        "cohort": "Reception",
+        "n_months": 55,
+        "obese_slope": -0.16702270214581869,
+        "obese_slope_p": 6.761218661713195e-06,
+        "photo_given_trend": 0.18225168565528221,
+        "photo_given_trend_p": 1.213859985585731e-18,
+        "sample": "after universal infant free school meals (2014/15-2018/19)"
+      },
+      {
+        "cohort": "Year 6",
+        "n_months": 55,
+        "obese_slope": -0.037934775243637586,
+        "obese_slope_p": 0.3570996665130992,
+        "photo_given_trend": 0.06472496807127168,
+        "photo_given_trend_p": 0.11468487750418005,
+        "sample": "after universal infant free school meals (2014/15-2018/19)"
       }
     ],
     "september_reset": [
@@ -6946,6 +6982,64 @@
         "pred_photoperiod_coef_given_trend": 0.08462060132465435,
         "pred_school_year_trend": -0.3319519754060658,
         "sign_test_p": 0.00048828125
+      }
+    ],
+    "slope_before_after_uifsm": [
+      {
+        "cohort": "Reception",
+        "outcome": "pct_obese",
+        "p_change": 0.37982970670874283,
+        "slope_before": -0.13247951040934824,
+        "slope_change_after": -0.034543191736470205
+      },
+      {
+        "cohort": "Reception",
+        "outcome": "pct_owob",
+        "p_change": 0.13733512759913505,
+        "slope_before": -0.30123163528830604,
+        "slope_change_after": -0.09130992308442182
+      },
+      {
+        "cohort": "Reception",
+        "outcome": "pct_underweight",
+        "p_change": 0.7453218366917078,
+        "slope_before": 0.02561681225753268,
+        "slope_change_after": 0.00399888656755824
+      },
+      {
+        "cohort": "Reception",
+        "outcome": "z_mean",
+        "p_change": 0.4196430395324219,
+        "slope_before": -0.009339585523474442,
+        "slope_change_after": -0.0019766810071010863
+      },
+      {
+        "cohort": "Year 6",
+        "outcome": "pct_obese",
+        "p_change": 0.7750062192978477,
+        "slope_before": -0.025558208849345947,
+        "slope_change_after": -0.012376566394290828
+      },
+      {
+        "cohort": "Year 6",
+        "outcome": "pct_owob",
+        "p_change": 0.8140181712327066,
+        "slope_before": -0.054101933075316355,
+        "slope_change_after": 0.011761821506224984
+      },
+      {
+        "cohort": "Year 6",
+        "outcome": "pct_underweight",
+        "p_change": 0.5919781875477219,
+        "slope_before": 0.035546854284935384,
+        "slope_change_after": -0.00564397618638993
+      },
+      {
+        "cohort": "Year 6",
+        "outcome": "z_mean",
+        "p_change": 0.7482949100492043,
+        "slope_before": -0.004516328210320952,
+        "slope_change_after": 0.0004419211859922924
       }
     ],
     "timing": {
