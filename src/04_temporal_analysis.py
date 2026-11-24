@@ -87,7 +87,9 @@ for c in COHORTS:
         timing.append({"cohort": c, "month": m, "children": int(tot[m]), "share_pct": share[m],
                        "share_min_year": per_year_share[m].min(), "share_max_year": per_year_share[m].max()})
     pos = (per_year_share * np.arange(1, 12)).sum(axis=1) / 100
+    autumn_by_year = per_year_share[ACAD_MONTHS[0:4]].sum(axis=1)
     results.setdefault("timing", {})[c] = {
+        "autumn_term_pct_range_by_year": [float(autumn_by_year.min()), float(autumn_by_year.max())],
         "terms_pct": terms, "modal_month": share.idxmax(), "share_by_month_pct": share.round(2).to_dict(),
         "mean_academic_month": float((share * np.arange(1, 12)).sum() / 100),
         "mean_academic_month_range_by_year": [float(pos.min()), float(pos.max())],

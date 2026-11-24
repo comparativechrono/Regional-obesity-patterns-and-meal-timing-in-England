@@ -44,7 +44,10 @@ rows.append(["National monthly series (NHS Digital Tables 3-4)", "", ""])
 rows.append(["  School years analysed", "2007/08 to 2018/19 (12 complete years)", "2007/08 to 2018/19 (12 complete years)"])
 rows.append(["  Children measured", f"{ms['children_measured_complete_years']['Reception']:,}",
              f"{ms['children_measured_complete_years']['Year 6']:,}"])
-for term in ["Sep-Dec (autumn term)", "Jan-Mar (spring term)", "Apr-Jul (summer term)"]:
+rows.append(["  Measured Sep-Dec (autumn term), % (range across years)"] + [
+    "{:.1f} ({:.1f}-{:.1f})".format(tm[c]["terms_pct"]["Sep-Dec (autumn term)"], *tm[c]["autumn_term_pct_range_by_year"])
+    for c in COHORTS])
+for term in ["Jan-Mar (spring term)", "Apr-Jul (summer term)"]:
     rows.append([f"  Measured {term}, %", f"{tm['Reception']['terms_pct'][term]:.1f}", f"{tm['Year 6']['terms_pct'][term]:.1f}"])
 rows.append(["  Modal month of measurement", tm["Reception"]["modal_month"], tm["Year 6"]["modal_month"]])
 rows.append(["  Mean school month of measurement (Sep = 1), range across years",
@@ -98,18 +101,16 @@ tables["Table_2_within_year"] = pd.DataFrame(rows, columns=[
 # Table 3. Shape of the within-year change: comparison of forms (delta AIC)
 # ---------------------------------------------------------------------------
 shape = pd.read_csv(OUT_TAB / "monthly_shape_comparison.csv")
-forms = ["linear school-year trend", "linear trend + April", "decline, then level + April",
-         "linear trend + day length + April", "month effects"]
 all_forms = [c[4:] for c in shape.columns if c.startswith("aic_")]
+forms = all_forms
 rows = []
 for _, r in shape.iterrows():
     best = min(r[f"aic_{f}"] for f in all_forms)
     rows.append([r.cohort, LABELS[r.outcome]] + [f"{r[f'aic_{f}'] - best:.1f}" for f in forms] +
                 [f"{r.end_of_decline} ({100 * r.end_of_decline_boot_dec_or_jan:.0f}%)", p_fmt(r.lack_of_fit_p)])
 tables["Table_3_within_year_shape"] = pd.DataFrame(rows, columns=[
-    "Cohort", "Outcome", "dAIC: single linear trend", "dAIC: linear trend + April",
-    "dAIC: decline, then level + April", "dAIC: linear trend + day length + April", "dAIC: month effects",
-    "End of decline (bootstrap % December or January)", "Decline-then-level vs month effects: lack-of-fit p"])
+    "Cohort", "Outcome"] + [f"dAIC: {f}" for f in forms] + [
+    "End of decline (bootstrap % December or January)", "Decline, then level + April vs month effects: lack-of-fit p"])
 
 # ---------------------------------------------------------------------------
 # Table 4. Latitude coefficients, 2023/24-2025/26 pooled, Models A and B

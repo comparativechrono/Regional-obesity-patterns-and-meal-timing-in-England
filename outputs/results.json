@@ -4721,6 +4721,10 @@
     ],
     "timing": {
       "Reception": {
+        "autumn_term_pct_range_by_year": [
+          15.155912676263993,
+          28.18775129177278
+        ],
         "children_measured": 6847756,
         "mean_academic_month": 6.345292238800565,
         "mean_academic_month_range_by_year": [
@@ -4748,6 +4752,10 @@
         }
       },
       "Year 6": {
+        "autumn_term_pct_range_by_year": [
+          18.371767569212047,
+          54.88835778234885
+        ],
         "children_measured": 6275706,
         "mean_academic_month": 5.498796948104325,
         "mean_academic_month_range_by_year": [
